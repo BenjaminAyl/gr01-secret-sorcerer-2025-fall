@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "407918042181",
+    "project_id": "gr01-secret-sorcerer-2025-fall",
+    "storage_bucket": "gr01-secret-sorcerer-2025-fall.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:407918042181:android:0cd57bf84081e1bdff172c",
+        "android_client_info": {
+          "package_name": "com.example.secret_sorcerer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2fW3k3Z4dDCKZ-8cQ9m0jwxrYjjlm_XY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyAvrBqulVZ4qrx3okWPnidMr5KFLNGuD0k</string>
+	<key>GCM_SENDER_ID</key>
+	<string>407918042181</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.secretSorcerer</string>
+	<key>PROJECT_ID</key>
+	<string>gr01-secret-sorcerer-2025-fall</string>
+	<key>STORAGE_BUCKET</key>
+	<string>gr01-secret-sorcerer-2025-fall.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:407918042181:ios:b2fe953565a0c045ff172c</string>
+</dict>
+</plist>
