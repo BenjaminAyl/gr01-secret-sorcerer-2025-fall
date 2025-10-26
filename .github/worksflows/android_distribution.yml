@@ -1,0 +1,77 @@
+# This is the name that shows up in the GitHub Actions tab
+name: Build and Distribute Android App to Firebase
+
+# WHEN should this automation run?
+on:
+  # Run whenever someone pushes directly to the main branch
+  push:
+    branches:
+      - main
+  # ALSO run when a Pull Request is closed (merged or just closed)
+  pull_request:
+    branches:
+      - main
+    types: [closed]  # Only trigger when PR is closed, not opened/updated
+
+# Define the actual work to be done
+jobs:
+  build_and_distribute:
+    # This condition prevents the job from running on EVERY PR close
+    # It only runs if:
+    # 1. Someone pushed directly to main, OR
+    # 2. A pull request was actually MERGED (not just closed without merging)
+    if: github.event_name == 'push' || (github.event.pull_request.merged == true)
+    
+    # Use a Linux virtual machine to run this job (free on GitHub)
+    runs-on: ubuntu-latest
+    
+    # List of sequential steps to execute
+    steps:
+    # Step 1: Download your code from the repository
+    - name: Checkout code
+      uses: actions/checkout@v4  # This is a pre-built action from GitHub
+    
+    # Step 2: Install Java 17 (required for Android app building)
+    - name: Set up Java
+      uses: actions/setup-java@v4  # Another pre-built action
+      with:
+        distribution: 'zulu'  # Which Java distribution to use
+        java-version: '17'    # Android requires Java 17 for newer builds
+    
+    # Step 3: Install Flutter SDK on the virtual machine
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2  # Community-created action for Flutter
+      with:
+        channel: 'stable'  # Use the stable release channel (not beta/dev)
+    
+    # Step 4: Download all the dependencies your Flutter app needs
+    - name: Install Flutter dependencies
+      run: flutter pub get  # Same command you run locally
+    
+    # Step 5: Build the actual Android APK file
+    - name: Build Android Release APK
+      run: flutter build apk --release  # Creates the installable .apk file
+      # This APK gets saved to: build/app/outputs/flutter-apk/app-release.apk
+    
+    # Step 6: Install Firebase command-line tools
+    - name: Set up Firebase CLI
+      run: npm install -g firebase-tools  # Install globally using npm
+    
+    # Step 7: Upload the built APK to Firebase App Distribution
+    - name: Distribute to Firebase App Distribution
+      run: |
+        # This is a multi-line command
+        firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
+          --app ${{ secrets.FIREBASE_APP_ID }} \
+          --release-notes "Build from commit ${{ github.sha }} by ${{ github.actor }}" \
+          --groups "testers"
+        # Explanation of the above command:
+        # - firebase appdistribution:distribute: Upload to App Distribution
+        # - build/app/outputs/flutter-apk/app-release.apk: Path to the APK we just built
+        # - --app: Which Firebase app to upload to (from GitHub secrets)
+        # - --release-notes: Description shown to testers (includes commit hash and who triggered it)
+        # - --groups "testers": Send to the "testers" group you created in Firebase
+      env:
+        # Provide the Firebase authentication token from GitHub secrets
+        FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        # This token allows the CLI to authenticate with Firebase without manual login
