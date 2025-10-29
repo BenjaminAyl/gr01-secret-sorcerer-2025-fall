@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/constants/app_spacing.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -16,26 +18,28 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: AppSpacing.screen,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           spacing: 10,
           children: [
             const Text(
               'Secret Sorcerer',
-              style: TextStyle(fontSize: 48),
+              style: TextStyles.title,
             ),
-            const SizedBox(height: 20),
+            AppSpacing.gapL,
             const Text(
               'Become a Sorcerer!',
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              style: TextStyles.heading,
             ),
+            AppSpacing.gapL,
             TextField(
               controller: _emailController,
               decoration: InputDecoration(
                 labelText: 'Email',
               ),
             ),
+            AppSpacing.gapM,
             TextField(
               controller: _passwordController,
               decoration: InputDecoration(
@@ -43,7 +47,7 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               obscureText: true,
             ),
-            const SizedBox(height: 20),
+            AppSpacing.gapL,
             ElevatedButton(
               onPressed: () {
                 // Handle login logic here
@@ -53,7 +57,7 @@ class _SignupScreenState extends State<SignupScreen> {
 			Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text("Already have an account?"),
+                const Text("Already have an account?", style: TextStyles.body),
                 TextButton(
                   onPressed: () => context.go('/'),
                   child: const Text('Login'),
