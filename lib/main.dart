@@ -33,6 +33,17 @@ class MainApp extends StatelessWidget {
             textStyle: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
+              fontFamily: GoogleFonts.quintessential().fontFamily,
+            ),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.customAccent,
+            textStyle: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              fontFamily: GoogleFonts.quintessential().fontFamily,
             ),
           ),
         ),

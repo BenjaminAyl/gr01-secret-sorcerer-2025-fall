@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:secret_sorcerer/constants/app_spacing.dart';
+import 'package:secret_sorcerer/constants/app_text_styling.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,44 +18,37 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: AppSpacing.screen,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           spacing: 10,
           children: [
-            const Text(
-              'Secret Sorcerer',
-              style: TextStyle(fontSize: 48),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Login',
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-            ),
+            const Text('Secret Sorcerer', style: TextStyles.title),
+            AppSpacing.gapL,
+            const Text('Login', style: TextStyles.heading),
+            AppSpacing.gapM,
             TextField(
               controller: _emailController,
-              decoration: InputDecoration(
-                labelText: 'Email',
-              ),
+              decoration: InputDecoration(labelText: 'Email'),
             ),
+            AppSpacing.gapM,
             TextField(
               controller: _passwordController,
-              decoration: InputDecoration(
-                labelText: 'Password',
-              ),
+              decoration: InputDecoration(labelText: 'Password'),
               obscureText: true,
             ),
-            const SizedBox(height: 20),
+            AppSpacing.gapL,
             ElevatedButton(
               onPressed: () {
                 // Handle login logic here
+                context.go('/home');
               },
               child: const Text('Login'),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text("Don't have an account?"),
+                const Text("Don't have an account?", style: TextStyles.body),
                 TextButton(
                   onPressed: () => context.go('/signup'),
                   child: const Text('Sign up'),
