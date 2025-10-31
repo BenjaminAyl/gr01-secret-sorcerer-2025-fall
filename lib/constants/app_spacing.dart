@@ -24,8 +24,39 @@ class AppSpacing {
   static const screen = EdgeInsets.all(20);
   static const section = EdgeInsets.symmetric(vertical: 16);
   static const item = EdgeInsets.symmetric(vertical: 8, horizontal: 12);
+  static const pillButton = EdgeInsets.symmetric(vertical: 8, horizontal: 16);
 
   // Specific themed uses
   static const titleSpacing = SizedBox(height: 32);
   static const buttonSpacing = SizedBox(height: 44);
+
+  // Dimension Sizing
+  static const double buttonHeightSmall = 44;
+  static const double buttonHeightMedium = 56;
+  static const double buttonHeightLarge = 80;
+
+  static const double avatarSmall = 36;
+  static const double avatarMedium = 56;
+  static const double avatarLarge = 72;
+
+  static const double cardWidthNarrow = 250;
+  static const double cardWidthMedium = 320;
+  static const double cardWidthWide = 400;
+
+  static const double iconSizeSmall = 20;
+  static const double iconSizeMedium = 32;
+  static const double iconSizeLarge = 48;
+
+  // Radius sizing
+  static const double radiusXS = 6;
+  static const double radiusS = 8;
+  static const double radiusM = 12;
+  static const double radiusL = 16;
+  static const double radiusXL = 24;
+
+  // Themed radius use-cases
+  static const double radiusButton = 35;
+  static const double radiusCard = 20;
+  static const double radiusAvatar = 32;
+  static const double radiusSheet = 40;
 }

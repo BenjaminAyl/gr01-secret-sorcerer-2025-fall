@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/widgets/primary_button.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -18,24 +20,18 @@ class HomeScreen extends StatelessWidget {
               const Text('Secret Sorcerer', style: TextStyles.title),
               AppSpacing.spaceXXL,
 
-              ElevatedButton(
+              PrimaryButton(
+                label: 'Host Game',
                 onPressed: () {
                   // TODO: route to /host when implemented
                 },
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(300, 80),
-                ),
-                child: const Text('Host Game', style: TextStyles.subheading),
               ),
-              AppSpacing.spaceL,
-              ElevatedButton(
+              AppSpacing.buttonSpacing,
+              PrimaryButton(
+                label: 'Join Game',
                 onPressed: () {
                   // TODO: route to /join when implemented
                 },
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(300, 80),
-                ),
-                child: const Text('Join Game', style: TextStyles.subheading),
               ),
 
               const Spacer(),
@@ -69,7 +65,7 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         GestureDetector(
                           onTap: () {
-                            // TODO: navigate to /profile when implemented
+                            context.go('/profile');
                           },
                           child: Image.asset(
                             'assets/images/wizard_hat.png', // TODO: CREATE ASSET
