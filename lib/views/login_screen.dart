@@ -29,12 +29,14 @@ class _LoginScreenState extends State<LoginScreen> {
             AppSpacing.gapM,
             TextField(
               controller: _emailController,
-              decoration: InputDecoration(labelText: 'Email'),
+              style: const TextStyle(color: Colors.black),
+              decoration: InputDecoration(hintText: 'Email'),
             ),
             AppSpacing.gapM,
             TextField(
               controller: _passwordController,
-              decoration: InputDecoration(labelText: 'Password'),
+              style: const TextStyle(color: Colors.black),
+              decoration: InputDecoration(hintText: 'Password'),
               obscureText: true,
             ),
             AppSpacing.gapL,
