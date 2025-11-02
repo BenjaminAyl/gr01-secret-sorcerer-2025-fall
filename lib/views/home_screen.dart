@@ -22,9 +22,7 @@ class HomeScreen extends StatelessWidget {
 
               PrimaryButton(
                 label: 'Host Game',
-                onPressed: () {
-                  // TODO: route to /host when implemented
-                },
+                onPressed: () => context.go('/lobby'),
               ),
               AppSpacing.buttonSpacing,
               PrimaryButton(
