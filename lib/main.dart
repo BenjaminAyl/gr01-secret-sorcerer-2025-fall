@@ -50,6 +50,9 @@ class MainApp extends StatelessWidget {
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
+          helperStyle: TextStyle(
+            color: Colors.black
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(36.0),
             borderSide: BorderSide.none,
