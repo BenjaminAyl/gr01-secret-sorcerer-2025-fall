@@ -1,15 +1,21 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:secret_sorcerer/app_router.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
+import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/firebase_options.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+final userAuth = UserAuth(); 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await Hive.initFlutter();
   runApp(const MainApp());
 }
 
