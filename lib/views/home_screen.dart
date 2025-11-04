@@ -27,10 +27,9 @@ class HomeScreen extends StatelessWidget {
               AppSpacing.buttonSpacing,
               PrimaryButton(
                 label: 'Join Game',
-                onPressed: () {
-                  // TODO: route to /join when implemented
-                },
+                onPressed: () => context.go('/join'),
               ),
+              
 
               const Spacer(),
 
