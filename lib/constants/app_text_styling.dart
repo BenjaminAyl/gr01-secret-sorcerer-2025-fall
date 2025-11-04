@@ -47,4 +47,11 @@ class TextStyles {
     color: AppColors.textAccent,
     letterSpacing: 0.5,
   );
+
+  static const TextStyle inputText = TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    color: AppColors.primaryBrand,
+    letterSpacing: 0.5,
+  );
 }

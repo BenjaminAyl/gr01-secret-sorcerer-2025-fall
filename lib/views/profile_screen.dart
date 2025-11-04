@@ -64,6 +64,11 @@ class ProfileScreen extends StatelessWidget {
                   label: 'Manage Friends',
                   onPressed: () => context.push('/profile/friends'),
                 ),
+                AppSpacing.buttonSpacing,
+                PrimaryButton(
+                  label: 'Log Out',
+                  onPressed: () => context.push('/'),
+                )
               ],
             ),
           ),
