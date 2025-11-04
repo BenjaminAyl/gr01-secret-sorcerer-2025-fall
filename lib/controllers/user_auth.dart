@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:secret_sorcerer/models/user_model.dart';
 
 CollectionReference usersDB = FirebaseFirestore.instance.collection("users");
 
@@ -28,6 +29,14 @@ class UserAuth {
       await Hive.openBox(_sessionBox);
     }
     return Hive.box(_sessionBox);
+  }
+
+  // Returns information about the current user
+  Future<AppUser?> getCurrentUser() async {
+    final box = await Hive.openBox(_sessionBox);
+    final data = box.get(_userKey);
+    if (data == null) return null;
+    return AppUser.fromMap(Map<String, dynamic>.from(data));
   }
 
   /// Returns true if [username] (case-insensitive) is not taken.
@@ -97,18 +106,21 @@ class UserAuth {
       'uid': currentUid,
       'email': userCredit.user!.email,
       'username': userData['Username'],
-      'displayName': userCredit.user!.displayName,
+      'nickname': userData['Nickname'],
     });
 
     return userCredit;
   }
 
   /// Signs the user out and clears session data.
-  ///
-  /// TODO: Implement sign-out logic.
   Future<void> signOut() async {
-    // TODO: implement sign-out logic
-  }
+  // Sign out from Firebase Auth
+  await FirebaseAuth.instance.signOut();
+
+  // Clear local session data
+  final box = await Hive.openBox('sessionBox');
+  await box.delete('user');
+}
 
   /// Updates the user's username in Firestore.
   ///

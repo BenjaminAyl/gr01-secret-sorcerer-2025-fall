@@ -3,13 +3,36 @@ import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/controllers/user_auth.dart';
+import 'package:secret_sorcerer/models/user_model.dart';
 import 'package:secret_sorcerer/widgets/primary_button.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  AppUser? _user;
+  final userAuth = UserAuth();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    final currentUser = await userAuth.getCurrentUser();
+    setState(() => _user = currentUser);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final nickname = _user?.nickname ?? '';
+    final username = '@${_user?.username ?? ''}';
     return Scaffold(
       backgroundColor: AppColors.primaryBrand,
       appBar: AppBar(
@@ -21,7 +44,6 @@ class ProfileScreen extends StatelessWidget {
             size: AppSpacing.iconSizeLarge,
           ),
           onPressed: () => context.go('/home'),
-          tooltip: 'Back',
         ),
         centerTitle: true,
         title: const Text('Profile', style: TextStyles.heading),
@@ -35,9 +57,8 @@ class ProfileScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AppSpacing.gapM,
-                // TODO: replace avatar with the user's avatar
                 const CircleAvatar(
-                  radius: AppSpacing.avatarMedium, // from constants
+                  radius: AppSpacing.avatarMedium,
                   backgroundColor: AppColors.secondaryBrand,
                   child: Icon(
                     Icons.person,
@@ -48,13 +69,11 @@ class ProfileScreen extends StatelessWidget {
                 AppSpacing.gapM,
 
                 // User name + username
-                const Text('Name', style: TextStyles.bodyLarge),
+                Text(nickname, style: TextStyles.bodyLarge),
                 AppSpacing.gapXS,
-                const Text('@username', style: TextStyles.body),
+                Text(username, style: TextStyles.body),
 
                 AppSpacing.gapXXL,
-
-                // Profile buttons
                 PrimaryButton(
                   label: 'Edit Profile',
                   onPressed: () => context.push('/profile/edit'),
@@ -67,8 +86,12 @@ class ProfileScreen extends StatelessWidget {
                 AppSpacing.buttonSpacing,
                 PrimaryButton(
                   label: 'Log Out',
-                  onPressed: () => context.push('/'),
-                )
+                  onPressed: () async {
+                    await userAuth.signOut();
+                    if (!context.mounted) return;
+                    context.push('/'); 
+                  },
+                ),
               ],
             ),
           ),
