@@ -2,13 +2,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secret_sorcerer/models/game_player.dart';
 import 'dart:math';
-
 import 'package:secret_sorcerer/models/game_state.dart';
 
 class FirebaseController {
-
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // -------------------------------
+  // 🔹 AUTHENTICATION
+  // -------------------------------
   Future<UserCredential> signUp(String email, String password) async {
     return await FirebaseAuth.instance.createUserWithEmailAndPassword(
       email: email,
@@ -17,59 +18,92 @@ class FirebaseController {
   }
 
   Future<UserCredential> signIn(String email, String password) async {
-  return await FirebaseAuth.instance.signInWithEmailAndPassword(
-    email: email,
-    password: password,
-  );
+    return await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
   }
 
-  //helper to fetch collection
-  Stream<DocumentSnapshot<Map<String, dynamic>>> watchLobby(int lobbyId) =>
-    _firestore.collection('lobbies').doc(lobbyId.toString()).snapshots();
-    
+  User? get currentUser => FirebaseAuth.instance.currentUser;
 
-  Stream<DocumentSnapshot> createLobby(int hostId) {
-    int randomInt = Random().nextInt(9999) + 1000;
-    final lobbyRef = _firestore.collection('lobbies').doc(randomInt.toString());
-    lobbyRef.set({
+  // -------------------------------
+  // 🔹 LOBBY MANAGEMENT
+  // -------------------------------
+  Stream<DocumentSnapshot<Map<String, dynamic>>> watchLobby(String lobbyId) =>
+      _firestore.collection('lobbies').doc(lobbyId).snapshots();
+
+  /// Create lobby with nickname mapping
+  Future<DocumentReference<Map<String, dynamic>>> createLobby() async {
+    final user = currentUser;
+    if (user == null) throw Exception('User not signed in');
+
+    final randomInt = Random().nextInt(8999) + 1000;
+    final code = randomInt.toString();
+    final lobbyRef = _firestore.collection('lobbies').doc(code);
+
+    // Fetch nickname from "users" collection
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final userData = userDoc.data() ?? {};
+    final nickname = userData['Nickname'] ?? 'Unknown';
+
+    await lobbyRef.set({
       'status': 'waiting',
-      'creatorId': hostId,
-      'players': [hostId],
+      'creatorId': user.uid,
+      'players': [user.uid],
+      'nicknames': {user.uid: nickname},
       'createdAt': FieldValue.serverTimestamp(),
     });
-    return lobbyRef.snapshots();
+
+    return lobbyRef;
   }
 
-  Stream<DocumentSnapshot> joinLobby(int lobbyId, int playerId) {
-    final lobbyRef = _firestore.collection('lobbies').doc(lobbyId.toString());
-    lobbyRef.update({
+  /// Add player and their nickname when joining
+  Future<void> joinLobby(String lobbyId, String playerId) async {
+    final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
+
+    // Fetch nickname from users collection
+    final userDoc = await _firestore.collection('users').doc(playerId).get();
+    final userData = userDoc.data() ?? {};
+    final nickname = userData['Nickname'] ?? 'Unknown';
+
+    await lobbyRef.update({
       'players': FieldValue.arrayUnion([playerId]),
+      'nicknames.$playerId': nickname,
     });
-    return lobbyRef.snapshots();
   }
 
-  Future<void> leaveLobby(int lobbyId, int playerId) async {
-    final lobbyRef = _firestore.collection('lobbies').doc(lobbyId.toString());
+  Future<void> leaveLobby(String lobbyId, String playerId) async {
+    final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
     await lobbyRef.update({
       'players': FieldValue.arrayRemove([playerId]),
+      'nicknames.$playerId': FieldValue.delete(),
     });
   }
 
-  Future<void> deleteLobby(int lobbyId) async {
-    final lobbyRef = _firestore.collection('lobbies').doc(lobbyId.toString());
+  Future<void> deleteLobby(String lobbyId) async {
+    final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
     await lobbyRef.delete();
   }
 
-   // Start game
-  Future<void> startGame(int lobbyId, List<GamePlayer> player) async {
-    final stateRef = _firestore.collection('states').doc(lobbyId.toString());
-    final lobbyRef = _firestore.collection('lobbies').doc(lobbyId.toString());
-    final state = GameState(player);
+  /// Reset the lobby to waiting state (after a round)
+  Future<void> resetLobby(String lobbyId) async {
+    await _firestore.collection('lobbies').doc(lobbyId).update({
+      'status': 'waiting',
+    });
+  }
+
+  // -------------------------------
+  // 🔹 GAME MANAGEMENT
+  // -------------------------------
+  Future<void> startGame(String lobbyId, List<GamePlayer> players) async {
+    final stateRef = _firestore.collection('states').doc(lobbyId);
+    final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
+    final state = GameState(players);
+
     await stateRef.set(state.toMap());
     await lobbyRef.update({'status': 'playing'});
   }
 
-  // Watch game state
-  Stream<DocumentSnapshot> watchGame(int code) =>
-      _firestore.collection('states').doc(code.toString()).snapshots();
+  Stream<DocumentSnapshot<Map<String, dynamic>>> watchGame(String lobbyId) =>
+      _firestore.collection('states').doc(lobbyId).snapshots();
 }

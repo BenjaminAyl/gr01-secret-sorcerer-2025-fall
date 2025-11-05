@@ -2,25 +2,25 @@ import 'package:secret_sorcerer/models/game_player.dart';
 
 class GameState {
 
-  late String phase;
+  late String phase = 'waiting';
 
-  late int charms;
+  late int charms = 0;
 
-  late int curses;
+  late int curses = 0;
 
-  late String headmaster;
+  late String headmaster = '';
 
-  late String? spellcaster;
+  late String? spellcaster = '';
 
-  late List<GamePlayer> players;
+  late List<GamePlayer> players = [];
 
-  late List<String> deck;
+  late List<String> deck = [];
 
-  late int headmasterIdx;
+  late int headmasterIdx = 0;
 
-  String? lastHeadmaster;
+  String? lastHeadmaster = '';
 
-  String? lastSpellcaster;
+  String? lastSpellcaster ='';
 
   GameState(List<GamePlayer> _players) {
     phase = 'start';

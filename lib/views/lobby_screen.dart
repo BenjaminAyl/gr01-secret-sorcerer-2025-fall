@@ -1,7 +1,11 @@
+// lib/views/lobby_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/controllers/lobby_controller.dart';
+import 'package:secret_sorcerer/models/game_player.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
@@ -16,28 +20,49 @@ class LobbyScreen extends StatefulWidget {
 }
 
 class _LobbyScreenState extends State<LobbyScreen> {
-  final LobbyController controller = LobbyController();
+  final _firebase = FirebaseController();
+  final _lobbyController = LobbyController();
+  late String playerId;
+  bool _attemptedAutoJoin = false;
 
   @override
   void initState() {
     super.initState();
-    controller.init(widget.code);
+    _initLobby();
   }
 
+  Future<void> _initLobby() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No signed-in user found.');
+    playerId = user.uid;
+    await _lobbyController.init(widget.code);
+  }
+
+  /// 🔹 Leave lobby — host deletes, others just leave
   Future<void> _leave(Map<String, dynamic> data) async {
-    await controller.leaveLobby(data);
-    if (mounted) context.go('/home');
+    final isHost = data['creatorId'] == playerId;
+    if (isHost) {
+      setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _lobbyController.leaveLobby(data);
+        if (mounted) context.go('/home');
+      });
+    } else {
+      await _lobbyController.leaveLobby(data);
+      if (mounted) context.go('/home');
+    }
   }
 
-  Future<void> _start(List<int> ids) async {
-    await controller.startGame(ids);
+  /// 🔹 Host starts the game
+  Future<void> _start(List<String> ids) async {
+    await _lobbyController.startGame(ids);
     if (mounted) context.go('/game/${widget.code}');
   }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: controller.lobbyStream,
+      stream: _firebase.watchLobby(widget.code),
       builder: (context, snap) {
         if (!snap.hasData) {
           return const Scaffold(
@@ -45,33 +70,45 @@ class _LobbyScreenState extends State<LobbyScreen> {
           );
         }
 
+        // 🔹 If lobby deleted or doesn't exist, return home
         if (!snap.data!.exists) {
-          return Scaffold(
-            backgroundColor: AppColors.primaryBrand,
-            body: Center(
-              child: Text(
-                'Lobby not found',
-                style: TextStyles.body.copyWith(color: Colors.white),
-              ),
-            ),
-          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) context.go('/home');
+          });
+          return const SizedBox.shrink();
         }
 
         final data = snap.data!.data()!;
         final status = data['status'] ?? 'waiting';
-        final creatorId = (data['creatorId'] as num).toInt();
-        final ids = List<int>.from((data['players'] ?? []).cast<int>());
-        final isHost = creatorId == controller.playerId;
-        final canStart = ids.length >= 2;
-        final hostName = 'Wizard_$creatorId';
-        final otherPlayers = ids.where((id) => id != creatorId).toList();
+        final creatorId = data['creatorId'] as String;
+        final ids = List<String>.from((data['players'] ?? []).cast<String>());
+        final nicknames = Map<String, dynamic>.from(data['nicknames'] ?? {});
+        final isHost = creatorId == playerId;
+        final canStart = ids.length > 1;
 
-        // auto-jump to game when host starts
+        // 🔹 Auto-join if somehow not in players list
+        if (!_attemptedAutoJoin && !ids.contains(playerId)) {
+          _attemptedAutoJoin = true;
+          _firebase.joinLobby(widget.code, playerId);
+        }
+
+        // 🔹 Lobby closing → kick everyone
+        if (status == 'closing') {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) context.go('/home');
+          });
+        }
+
+        // 🔹 Status playing → move to game screen
         if (status == 'playing') {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) context.go('/game/${widget.code}');
           });
         }
+
+        // --- UI section ---
+        final hostName = nicknames[creatorId] ?? 'Host';
+        final otherPlayers = ids.where((id) => id != creatorId).toList();
 
         return Scaffold(
           backgroundColor: AppColors.primaryBrand,
@@ -91,7 +128,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // 🔹 Lobby Code Banner (Top)
+                  // 🔹 Lobby Code Banner
                   Text(
                     'Lobby Code:',
                     style: TextStyles.subheading.copyWith(
@@ -106,8 +143,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                         const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                     decoration: BoxDecoration(
                       color: AppColors.secondaryBrand,
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusL),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusL),
                     ),
                     child: Text(
                       widget.code,
@@ -149,7 +185,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ),
                   AppSpacing.gapL,
 
-                  // 🔹 Player List below host
+                  // 🔹 Player list below host
                   Expanded(
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
@@ -160,7 +196,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
                               spacing: 16,
                               runSpacing: 16,
                               alignment: WrapAlignment.center,
-                              children: otherPlayers.map((pid) {
+                              children: otherPlayers.map((uid) {
+                                final name = nicknames[uid] ?? 'Unknown';
                                 return Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -172,7 +209,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                     ),
                                     AppSpacing.gapXS,
                                     Text(
-                                      'Wizard_$pid',
+                                      name,
                                       style: TextStyles.bodySmall.copyWith(
                                         color: AppColors.textAccent,
                                       ),
@@ -191,7 +228,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             ),
                           AppSpacing.spaceL,
 
-                          // 🔹 Start button or waiting text
+                          // 🔹 Start button (host only)
                           if (isHost)
                             SizedBox(
                               width: 220,

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/widgets/primary_button.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
-import 'package:secret_sorcerer/utils/dev_auth.dart';
-
 
 class JoinLobbyScreen extends StatefulWidget {
   const JoinLobbyScreen({super.key});
@@ -17,6 +16,7 @@ class JoinLobbyScreen extends StatefulWidget {
 
 class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
   final TextEditingController _controller = TextEditingController();
+  final controller = FirebaseController();
 
   bool get _isCodeComplete => _controller.text.length == 4;
 
@@ -26,20 +26,27 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
     super.dispose();
   }
 
-  void _handleJoinPressed() async {
-    final controller = FirebaseController();
-    final playerId = await devSignInAndGetPlayerId();
-
-    final code = int.tryParse(_controller.text.trim());
-    if (code == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Enter valid 4-digit code')));
+  Future<void> _handleJoinPressed() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in first.')),
+      );
       return;
     }
 
-  await controller.joinLobby(code, playerId).first;
-  if (mounted) context.go('/lobby/$code');
-}
+    final code = _controller.text.trim();
+    if (code.isEmpty || code.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid 4-digit code.')),
+      );
+      return;
+    }
+
+    await controller.joinLobby(code, user.uid);
+    if (mounted) context.go('/lobby/$code');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -51,7 +58,6 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // ---- Title ----
                 Text(
                   'Enter Game Code',
                   style: TextStyles.title.copyWith(
@@ -60,12 +66,8 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
                       Shadow(blurRadius: 10, color: AppColors.customAccent),
                     ],
                   ),
-                  textAlign: TextAlign.center,
                 ),
-
                 AppSpacing.gapXL,
-
-                // ---- 4-digit input ----
                 SizedBox(
                   width: 200,
                   child: TextField(
@@ -92,16 +94,14 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
                       filled: true,
                       fillColor: AppColors.secondaryBrand.withOpacity(0.4),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.radiusL),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusL),
                         borderSide: BorderSide(
                           color: Colors.white.withOpacity(0.3),
                           width: 2,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.radiusL),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusL),
                         borderSide: const BorderSide(
                           color: AppColors.customAccent,
                           width: 2,
@@ -111,12 +111,9 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
-
                 AppSpacing.gapXL,
-
-                // ---- Join Button ----
                 Opacity(
-                  opacity: _isCodeComplete ? 1.0 : 0.5,
+                  opacity: _isCodeComplete ? 1 : 0.5,
                   child: IgnorePointer(
                     ignoring: !_isCodeComplete,
                     child: PrimaryButton(
@@ -125,16 +122,12 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
                     ),
                   ),
                 ),
-
                 AppSpacing.gapL,
-
-                // ---- Helper text ----
                 Text(
                   'Ask your host for their 4-digit code',
                   style: TextStyles.body.copyWith(
                     color: Colors.white.withOpacity(0.8),
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),
