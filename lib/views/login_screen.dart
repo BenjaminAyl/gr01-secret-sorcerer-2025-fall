@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/main.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -41,9 +42,24 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             AppSpacing.gapL,
             ElevatedButton(
-              onPressed: () {
-                // Handle login logic here
-                context.go('/home');
+              onPressed: () async {
+                try {
+                  final email = _emailController.text.trim();
+                  final password = _passwordController.text.trim();
+
+                  await userAuth.signIn(email: email, password: password);
+
+                  if (!context.mounted) return;
+                  context.go('/home');
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Login failed: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               },
               child: const Text('Login'),
             ),
