@@ -1,22 +1,38 @@
-import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secret_sorcerer/controllers/firebase.dart';
+import 'package:secret_sorcerer/models/game_player.dart';
+import 'package:secret_sorcerer/utils/dev_auth.dart';
 
 class LobbyController {
-  late String lobbyCode;
-  late List<String> fakePlayers;
+  final FirebaseController _firebase = FirebaseController();
+  late int playerId;
+  late int lobbyId;
+  late Stream<DocumentSnapshot<Map<String, dynamic>>> lobbyStream;
 
-  LobbyController() {
-    lobbyCode = _generateLobbyCode();
-    fakePlayers = _generatePlayers();
+  /// Initializes the lobby controller for an existing lobby
+  Future<void> init(String code) async {
+    lobbyId = int.parse(code);
+    playerId = await devSignInAndGetPlayerId();
+    lobbyStream = _firebase.watchLobby(lobbyId);
   }
 
-  String _generateLobbyCode() {
-    final rand = Random();
-    return (rand.nextInt(9000) + 1000).toString(); // 4-digit code
+  /// Deletes the lobby if host, removes self otherwise
+  Future<void> leaveLobby(Map<String, dynamic> data) async {
+    final creatorId = (data['creatorId'] as num).toInt();
+    final isHost = creatorId == playerId;
+
+    if (isHost) {
+      await _firebase.deleteLobby(lobbyId);
+    } else {
+      await _firebase.leaveLobby(lobbyId, playerId);
+    }
   }
 
-  List<String> _generatePlayers() {
-    final rand = Random();
-    final count = rand.nextInt(10) + 1; // between 1–10 players
-    return List.generate(count, (i) => 'Wizard_${i + 1}');
+  /// Starts the game
+  Future<void> startGame(List<int> ids) async {
+    final players = ids
+        .map((id) => GamePlayer(username: 'Wizard_$id', role: 'unknown'))
+        .toList();
+    await _firebase.startGame(lobbyId, players);
   }
 }

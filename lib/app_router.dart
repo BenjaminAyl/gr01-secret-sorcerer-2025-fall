@@ -19,9 +19,8 @@ final GoRouter router = GoRouter(
     GoRoute(path: '/profile', builder:(context, state)=> ProfileScreen()),
     GoRoute(path: '/profile/edit', builder:(context, state)=> EditProfileScreen()),
     GoRoute(path: '/profile/friends', builder:(context, state)=> ManageFriendsScreen()),
-    GoRoute(path: '/lobby', builder:(context, state)=> LobbyScreen()),
+    GoRoute(path: '/lobby/:code', builder: (context, state) => LobbyScreen(code: state.pathParameters['code']!),),
+    GoRoute(path: '/game/:code', builder: (context, state) => GameScreen(code: state.pathParameters['code']!),),
     GoRoute(path: '/join', builder:(context, state)=> JoinLobbyScreen()),
-    GoRoute(path: '/game', builder:(context, state)=> GameScreen()),
-
   ]
 );

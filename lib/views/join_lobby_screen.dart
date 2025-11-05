@@ -4,6 +4,9 @@ import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/widgets/primary_button.dart';
+import 'package:secret_sorcerer/controllers/firebase.dart';
+import 'package:secret_sorcerer/utils/dev_auth.dart';
+
 
 class JoinLobbyScreen extends StatefulWidget {
   const JoinLobbyScreen({super.key});
@@ -23,11 +26,20 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
     super.dispose();
   }
 
-  void _handleJoinPressed() {
-    // For now, just go to the game screen (mock host)
-    context.go('/lobby');
-  }
+  void _handleJoinPressed() async {
+    final controller = FirebaseController();
+    final playerId = await devSignInAndGetPlayerId();
 
+    final code = int.tryParse(_controller.text.trim());
+    if (code == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Enter valid 4-digit code')));
+      return;
+    }
+
+  await controller.joinLobby(code, playerId).first;
+  if (mounted) context.go('/lobby/$code');
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(

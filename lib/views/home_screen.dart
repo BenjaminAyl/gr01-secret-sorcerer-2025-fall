@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/widgets/primary_button.dart';
+import 'package:secret_sorcerer/utils/dev_auth.dart';
+import 'package:secret_sorcerer/controllers/firebase.dart';
+
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -22,7 +25,16 @@ class HomeScreen extends StatelessWidget {
 
               PrimaryButton(
                 label: 'Host Game',
-                onPressed: () => context.go('/lobby'),
+                onPressed: () async {
+                  final controller = FirebaseController();
+                  final playerId = await devSignInAndGetPlayerId();
+
+                  final lobbyStream = controller.createLobby(playerId);
+                  final snap = await lobbyStream.first;
+                  final lobbyId = int.parse(snap.id);
+
+                  if (context.mounted) context.go('/lobby/$lobbyId');
+                },
               ),
               AppSpacing.buttonSpacing,
               PrimaryButton(

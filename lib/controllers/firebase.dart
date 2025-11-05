@@ -23,11 +23,16 @@ class FirebaseController {
   );
   }
 
+  //helper to fetch collection
+  Stream<DocumentSnapshot<Map<String, dynamic>>> watchLobby(int lobbyId) =>
+    _firestore.collection('lobbies').doc(lobbyId.toString()).snapshots();
+    
+
   Stream<DocumentSnapshot> createLobby(int hostId) {
-    int randomInt = Random().nextInt(9999) + 1;
+    int randomInt = Random().nextInt(9999) + 1000;
     final lobbyRef = _firestore.collection('lobbies').doc(randomInt.toString());
     lobbyRef.set({
-      'status': 'starting',
+      'status': 'waiting',
       'creatorId': hostId,
       'players': [hostId],
       'createdAt': FieldValue.serverTimestamp(),
@@ -55,13 +60,16 @@ class FirebaseController {
     await lobbyRef.delete();
   }
 
+   // Start game
   Future<void> startGame(int lobbyId, List<GamePlayer> player) async {
-    final gameStateRef = _firestore.collection('states').doc(lobbyId.toString());
-    final newGameState = GameState(player);
-    await gameStateRef.set(newGameState.toMap());
+    final stateRef = _firestore.collection('states').doc(lobbyId.toString());
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId.toString());
-    await lobbyRef.update({
-      'status': 'playing',
-    });
+    final state = GameState(player);
+    await stateRef.set(state.toMap());
+    await lobbyRef.update({'status': 'playing'});
   }
+
+  // Watch game state
+  Stream<DocumentSnapshot> watchGame(int code) =>
+      _firestore.collection('states').doc(code.toString()).snapshots();
 }
