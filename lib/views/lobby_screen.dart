@@ -38,7 +38,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
     await _lobbyController.init(widget.code);
   }
 
-  /// 🔹 Leave lobby — host deletes, others just leave
   Future<void> _leave(Map<String, dynamic> data) async {
     final isHost = data['creatorId'] == playerId;
     if (isHost) {
@@ -53,7 +52,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
   }
 
-  /// 🔹 Host starts the game
+  //Host starts the game
   Future<void> _start(List<String> ids) async {
     await _lobbyController.startGame(ids);
     if (mounted) context.go('/game/${widget.code}');
@@ -70,7 +69,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
           );
         }
 
-        // 🔹 If lobby deleted or doesn't exist, return home
+        //lobby fallback
         if (!snap.data!.exists) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) context.go('/home');
@@ -86,27 +85,27 @@ class _LobbyScreenState extends State<LobbyScreen> {
         final isHost = creatorId == playerId;
         final canStart = ids.length > 1;
 
-        // 🔹 Auto-join if somehow not in players list
+        //join if somehow not in players list
         if (!_attemptedAutoJoin && !ids.contains(playerId)) {
           _attemptedAutoJoin = true;
           _firebase.joinLobby(widget.code, playerId);
         }
 
-        // 🔹 Lobby closing → kick everyone
+        //kick everyone out of my lobby
         if (status == 'closing') {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) context.go('/home');
           });
         }
 
-        // 🔹 Status playing → move to game screen
+        //move to game screen
         if (status == 'playing') {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) context.go('/game/${widget.code}');
           });
         }
 
-        // --- UI section ---
+        //ALL UI
         final hostName = nicknames[creatorId] ?? 'Host';
         final otherPlayers = ids.where((id) => id != creatorId).toList();
 
@@ -128,7 +127,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // 🔹 Lobby Code Banner
+                  //Lobby Code Banner
                   Text(
                     'Lobby Code:',
                     style: TextStyles.subheading.copyWith(
@@ -157,7 +156,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ),
                   AppSpacing.gapL,
 
-                  // 🔹 Host section
+                  //Host section
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -185,7 +184,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ),
                   AppSpacing.gapL,
 
-                  // 🔹 Player list below host
+                  //Player list below host
                   Expanded(
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
@@ -228,7 +227,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             ),
                           AppSpacing.spaceL,
 
-                          // 🔹 Start button (host only)
+                          //Start button (host only)
                           if (isHost)
                             SizedBox(
                               width: 220,

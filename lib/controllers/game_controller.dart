@@ -1,4 +1,4 @@
-// lib/controllers/game_controller.dart
+
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
@@ -11,7 +11,7 @@ class GameController {
   Timer? _timer;
   final FirebaseController _firebase = FirebaseController();
 
-  // Call this ONLY on the host device
+  // Call this on the host device
   void startCountdown(String lobbyId, void Function() onComplete) {
     countdown = 10;
 
@@ -35,7 +35,7 @@ class GameController {
   }
 
   Future<void> endGame(String lobbyId) async {
-    // delete state, flip lobby back to waiting
+    // delete state and change lobby back to waiting
     await FirebaseFirestore.instance.collection('states').doc(lobbyId).delete();
     await _firebase.resetLobby(lobbyId);
   }

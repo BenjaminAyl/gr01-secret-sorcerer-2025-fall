@@ -7,9 +7,7 @@ import 'package:secret_sorcerer/models/game_state.dart';
 class FirebaseController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // -------------------------------
-  // 🔹 AUTHENTICATION
-  // -------------------------------
+  //authentication management
   Future<UserCredential> signUp(String email, String password) async {
     return await FirebaseAuth.instance.createUserWithEmailAndPassword(
       email: email,
@@ -26,13 +24,10 @@ class FirebaseController {
 
   User? get currentUser => FirebaseAuth.instance.currentUser;
 
-  // -------------------------------
-  // 🔹 LOBBY MANAGEMENT
-  // -------------------------------
+  //lobby management
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchLobby(String lobbyId) =>
       _firestore.collection('lobbies').doc(lobbyId).snapshots();
 
-  /// Create lobby with nickname mapping
   Future<DocumentReference<Map<String, dynamic>>> createLobby() async {
     final user = currentUser;
     if (user == null) throw Exception('User not signed in');
@@ -41,7 +36,7 @@ class FirebaseController {
     final code = randomInt.toString();
     final lobbyRef = _firestore.collection('lobbies').doc(code);
 
-    // Fetch nickname from "users" collection
+    //get nickname
     final userDoc = await _firestore.collection('users').doc(user.uid).get();
     final userData = userDoc.data() ?? {};
     final nickname = userData['Nickname'] ?? 'Unknown';
@@ -57,7 +52,7 @@ class FirebaseController {
     return lobbyRef;
   }
 
-  /// Add player and their nickname when joining
+  //Add player and their nickname when joining
   Future<void> joinLobby(String lobbyId, String playerId) async {
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
 
@@ -80,21 +75,21 @@ class FirebaseController {
     });
   }
 
+
   Future<void> deleteLobby(String lobbyId) async {
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
+    await lobbyRef.update({'status': 'closing'}).catchError((_) {});
+    await Future.delayed(const Duration(milliseconds: 300));
     await lobbyRef.delete();
   }
-
-  /// Reset the lobby to waiting state (after a round)
+  ///Reset the lobby to waiting state (after a round)
   Future<void> resetLobby(String lobbyId) async {
     await _firestore.collection('lobbies').doc(lobbyId).update({
       'status': 'waiting',
     });
   }
 
-  // -------------------------------
-  // 🔹 GAME MANAGEMENT
-  // -------------------------------
+  //game management
   Future<void> startGame(String lobbyId, List<GamePlayer> players) async {
     final stateRef = _firestore.collection('states').doc(lobbyId);
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);

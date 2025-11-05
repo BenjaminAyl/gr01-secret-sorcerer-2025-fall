@@ -21,7 +21,7 @@ class _GameScreenState extends State<GameScreen> {
   late final WizardGameView _game;
   String? _creatorId;
   String? _uid;
-  bool _navigatedOut = false; // ✅ prevents double navigation
+  bool _navigatedOut = false; //no double navigation
 
   @override
   void initState() {
@@ -36,18 +36,17 @@ class _GameScreenState extends State<GameScreen> {
     super.dispose();
   }
 
-  /// 🔹 Host-only timer start
+  ///Host-only timer start
   void _maybeStartHostTimer() {
     if (_creatorId != null && _uid == _creatorId) {
       _controller.startCountdown(widget.code, () {
-        // Host triggers Firestore reset through endGame()
+        //Host triggers Firestore reset through endGame()
       });
     }
   }
 
-  /// 🔹 Clean navigation back to the lobby
   void _goBackToLobby() {
-    if (_navigatedOut || !mounted) return; // guard against duplicates
+    if (_navigatedOut || !mounted) return;  //no duplicates
     _navigatedOut = true;
     context.go('/lobby/${widget.code}');
   }
@@ -78,7 +77,7 @@ class _GameScreenState extends State<GameScreen> {
         _creatorId ??= lobby['creatorId'] as String?;
         final status = lobby['status'];
 
-        // ✅ Lobby reset → go back to lobby
+        // Lobby reset → go back to lobby
         if (status == 'waiting') {
           WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
         }
@@ -94,7 +93,7 @@ class _GameScreenState extends State<GameScreen> {
               );
             }
 
-            // ✅ Game state deleted → end of round → return to lobby
+            // Game state deleted → end of round → return to lobby
             if (!stateSnap.data!.exists) {
               WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
               return const SizedBox.shrink();
@@ -110,7 +109,7 @@ class _GameScreenState extends State<GameScreen> {
               body: Stack(
                 children: [
                   GameWidget(game: _game),
-                  // HUD overlay for timer and info
+                  //HUD overlay for timer and info
                   Positioned(
                     left: 16,
                     right: 16,

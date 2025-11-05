@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 
 class WizardGameView extends FlameGame {
-  TextComponent? text; // nullable now ✅
+  TextComponent? text; // nullable now
   int remainingSeconds = 10;
   final Random _random = Random();
   double _spawnTimer = 0;
@@ -81,8 +81,6 @@ class WizardGameView extends FlameGame {
       ),
     ));
   }
-
-  // ✅ Safe update — won’t crash before onLoad completes
   void updateCountdown(int seconds) {
     remainingSeconds = seconds;
     if (text != null) {

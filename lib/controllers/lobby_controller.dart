@@ -16,7 +16,6 @@ class LobbyController {
     playerId = user.uid;
     lobbyStream = _firebase.watchLobby(lobbyId);
   }
-
   Future<void> leaveLobby(Map<String, dynamic> data) async {
     final creatorId = data['creatorId'].toString();
     final isHost = creatorId == playerId;
