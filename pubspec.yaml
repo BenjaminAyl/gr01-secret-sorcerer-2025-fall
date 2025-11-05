@@ -13,6 +13,7 @@ dependencies:
   go_router: ^16.3.0
   firebase_auth: ^6.1.1
   google_fonts: ^6.3.2
+  flame: ^1.33.0
   cloud_firestore: ^6.0.3
   hive: ^2.2.3
   hive_flutter: ^1.1.0
