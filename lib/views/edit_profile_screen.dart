@@ -3,16 +3,40 @@ import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
-
-// NEW: use the extracted widgets
+import 'package:secret_sorcerer/models/user_model.dart';
 import 'package:secret_sorcerer/widgets/info_row.dart';
 import 'package:secret_sorcerer/widgets/pill_button.dart';
+import 'package:secret_sorcerer/controllers/user_auth.dart';
 
-class EditProfileScreen extends StatelessWidget {
+class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
+}
+
+class _EditProfileScreenState extends State<EditProfileScreen> {
+  AppUser? _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+  final userAuth = UserAuth();
+  final AppUser? currentUser = await userAuth.getCurrentUser();
+  if (!mounted) return;
+  setState(() => _user = currentUser);
+}
+
+  @override
   Widget build(BuildContext context) {
+    final nickame = _user?.nickname ?? '';
+    final username = '@${_user?.username ?? ''}';
+    final email = _user?.email ?? '';
+
     return Scaffold(
       backgroundColor: AppColors.primaryBrand,
       appBar: AppBar(
@@ -68,12 +92,12 @@ class EditProfileScreen extends StatelessWidget {
 
                 AppSpacing.gapXXL,
 
-                // Rows
+                // Rows (now show loaded values)
                 InfoRow(
-                  title: 'Display Name',
-                  value: 'Name',
+                  title: 'Nickname',
+                  value: nickame,
                   onPress: () {
-                    // TODO: context.push('/profile/edit/display-name');
+                    // TODO: context.push('/profile/edit/nickname');
                   },
                 ),
 
@@ -81,9 +105,19 @@ class EditProfileScreen extends StatelessWidget {
 
                 InfoRow(
                   title: 'Username',
-                  value: '@username',
+                  value: username,
                   onPress: () {
                     // TODO: context.push('/profile/edit/username');
+                  },
+                ),
+
+                AppSpacing.gapXL,
+
+                InfoRow(
+                  title: 'Email',
+                  value: email,
+                  onPress: () {
+                    // TODO: context.push('/profile/edit/password');
                   },
                 ),
 
