@@ -29,6 +29,10 @@ class PrimaryButton extends StatelessWidget {
           minimumSize: Size(double.infinity, height),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusButton),
+            side: BorderSide(
+              color: AppColors.customAccent, 
+              width: 2.0, 
+            ),
           ),
           elevation: 0,
         ),

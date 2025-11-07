@@ -5,7 +5,7 @@ import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
-import 'package:secret_sorcerer/widgets/primary_button.dart';
+import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -34,9 +34,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final nickname = _user?.nickname ?? '';
     final username = '@${_user?.username ?? ''}';
     return Scaffold(
-      backgroundColor: AppColors.primaryBrand,
+      backgroundColor: AppColors.secondaryBG,
       appBar: AppBar(
-        backgroundColor: AppColors.primaryBrand,
+        backgroundColor: AppColors.secondaryBG,
         leading: IconButton(
           icon: const Icon(
             Icons.cancel,

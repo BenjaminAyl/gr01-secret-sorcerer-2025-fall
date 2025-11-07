@@ -2,27 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
-import 'pill_button.dart';
+import 'buttons/pill_button.dart';
 
 class InfoRow extends StatelessWidget {
   final String title;
-  final String? value; // <- now optional
-  final String actionLabel; // <- customizable action text
-  final Color? actionColor; // <- optional color override
-  final VoidCallback onPress;
+  final String? value;
+  final String? actionLabel;     // made optional
+  final Color? actionColor;
+  final VoidCallback? onPress;   // made optional
 
   const InfoRow({
     super.key,
     required this.title,
-    this.value, // <- optional
-    required this.onPress,
-    this.actionLabel = 'Edit', // <- default label
-    this.actionColor, // <- optional
+    this.value,
+    this.onPress,
+    this.actionLabel,
+    this.actionColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasValue = (value != null && value!.trim().isNotEmpty);
+    final hasButton = onPress != null;
 
     return Row(
       children: [
@@ -32,27 +33,28 @@ class InfoRow extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: TextStyles.bodyLarge.copyWith(color: Colors.white),
+                style: TextStyles.bodyLarge.copyWith(color: AppColors.textAccent),
               ),
               if (hasValue) ...[
                 AppSpacing.gapXS,
                 Text(
                   value!,
                   style: TextStyles.body.copyWith(
-                    color: AppColors.customAccent,
+                    color: AppColors.textAccentSecondary,
                   ),
                 ),
               ],
             ],
           ),
         ),
-        AppSpacing.gapWL,
-        PillButton.small(
-          label: actionLabel,
-          onPressed: onPress,
-          // If your PillButton supports a color prop, pass it here. Otherwise, keep default.
-          // color: actionColor ?? AppColors.secondaryBrand,
-        ),
+
+        if (hasButton) ...[
+          AppSpacing.gapWL,
+          PillButton.small(
+            label: actionLabel ?? 'Edit',
+            onPressed: onPress!,
+          ),
+        ],
       ],
     );
   }

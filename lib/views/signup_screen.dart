@@ -26,9 +26,8 @@ class _SignupScreenState extends State<SignupScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           spacing: 10,
           children: [
-            const Text('Secret Sorcerer', style: TextStyles.title),
-            AppSpacing.gapL,
-            const Text('Become a Sorcerer!', style: TextStyles.heading),
+            Text('Secret Sorcerer', style: TextStyles.title),
+            Text('Become a Sorcerer!', style: TextStyles.title.copyWith(fontSize: 32)),
             AppSpacing.gapL,
             TextField(
               controller: _emailController,

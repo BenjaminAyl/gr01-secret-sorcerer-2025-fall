@@ -4,8 +4,11 @@ import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
+import 'package:secret_sorcerer/widgets/account/edit_nickname.dart';
+import 'package:secret_sorcerer/widgets/account/edit_password.dart';
+import 'package:secret_sorcerer/widgets/account/edit_username.dart';
 import 'package:secret_sorcerer/widgets/info_row.dart';
-import 'package:secret_sorcerer/widgets/pill_button.dart';
+import 'package:secret_sorcerer/widgets/buttons/pill_button.dart';
 import 'package:secret_sorcerer/controllers/user_auth.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -25,22 +28,65 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _loadUser() async {
-  final userAuth = UserAuth();
-  final AppUser? currentUser = await userAuth.getCurrentUser();
-  if (!mounted) return;
-  setState(() => _user = currentUser);
-}
+    final userAuth = UserAuth();
+    final AppUser? currentUser = await userAuth.getCurrentUser();
+    // TODO: update userAuth to use firestore to store current user
+    if (!mounted) return;
+    setState(() => _user = currentUser);
+  }
+
+  Future<void> _editNickname() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => EditNicknameDialog(
+        initial: _user?.nickname ?? '',
+        save: (nickname) async {
+          // TODO: Implement nickname update logic later
+          return null; // returning null means "no error" for now
+        },
+      ),
+    );
+  }
+
+  Future<void> _editUsername() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => EditUsernameDialog(
+        initial: _user?.username ?? '',
+        save: (username) async {
+          // TODO: Implement username update logic later
+          return null;
+        },
+      ),
+    );
+  }
+
+  Future<void> _editPassword() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => EditPasswordDialog(
+        verifyCurrent: (currentPassword) async {
+          // TODO: Implement password verification later
+          return true; // temporary success
+        },
+        changePassword: (newPassword) async {
+          // TODO: Implement password change logic later
+          return null;
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final nickame = _user?.nickname ?? '';
+    final nickname = _user?.nickname ?? '';
     final username = '@${_user?.username ?? ''}';
     final email = _user?.email ?? '';
 
     return Scaffold(
-      backgroundColor: AppColors.primaryBrand,
+      backgroundColor: AppColors.secondaryBG,
       appBar: AppBar(
-        backgroundColor: AppColors.primaryBrand,
+        backgroundColor: AppColors.secondaryBG,
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(
@@ -82,7 +128,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         child: PillButton.small(
                           label: 'Edit',
                           onPressed: () {
-                            // TODO: context.push('/profile/avatar');
+                            // TODO: push avatar editor route
+                            // context.push('/profile/avatar');
                           },
                         ),
                       ),
@@ -92,13 +139,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                 AppSpacing.gapXXL,
 
-                // Rows (now show loaded values)
+                InfoRow(title: 'Email', value: email),
+
+                AppSpacing.gapXL,
+
                 InfoRow(
                   title: 'Nickname',
-                  value: nickame,
-                  onPress: () {
-                    // TODO: context.push('/profile/edit/nickname');
-                  },
+                  value: nickname,
+                  onPress: _editNickname,
                 ),
 
                 AppSpacing.gapXL,
@@ -106,19 +154,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 InfoRow(
                   title: 'Username',
                   value: username,
-                  onPress: () {
-                    // TODO: context.push('/profile/edit/username');
-                  },
-                ),
-
-                AppSpacing.gapXL,
-
-                InfoRow(
-                  title: 'Email',
-                  value: email,
-                  onPress: () {
-                    // TODO: context.push('/profile/edit/password');
-                  },
+                  onPress: _editUsername,
                 ),
 
                 AppSpacing.gapXL,
@@ -126,9 +162,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 InfoRow(
                   title: 'Password',
                   value: '••••••••',
-                  onPress: () {
-                    // TODO: context.push('/profile/edit/password');
-                  },
+                  onPress: _editPassword,
                 ),
               ],
             ),

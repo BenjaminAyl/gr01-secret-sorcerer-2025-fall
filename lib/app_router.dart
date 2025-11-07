@@ -3,7 +3,7 @@ import 'package:secret_sorcerer/views/edit_profile_screen.dart';
 import 'package:secret_sorcerer/views/friends_screen.dart';
 import 'package:secret_sorcerer/views/join_lobby_screen.dart';
 import 'package:secret_sorcerer/views/lobby_screen.dart';
-import 'package:secret_sorcerer/views/profile_screen.dart';
+import 'package:secret_sorcerer/views/profile/profile_screen.dart';
 import 'package:secret_sorcerer/views/home_screen.dart';
 import 'package:secret_sorcerer/views/login_screen.dart';
 import 'package:secret_sorcerer/views/signup_screen.dart';

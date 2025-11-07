@@ -8,13 +8,11 @@ import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/firebase_options.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-final userAuth = UserAuth(); 
+final userAuth = UserAuth();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await Hive.initFlutter();
   runApp(const MainApp());
 }
@@ -27,11 +25,9 @@ class MainApp extends StatelessWidget {
     return MaterialApp.router(
       theme: ThemeData(
         scaffoldBackgroundColor: AppColors.primaryBrand,
-        textTheme: ThemeData.light().textTheme.apply(
-          bodyColor: Colors.white,
-          displayColor: Colors.white,
-          fontFamily: GoogleFonts.quintessential().fontFamily,
-        ),
+        textTheme: GoogleFonts.caudexTextTheme(
+          ThemeData.light().textTheme,
+        ).apply(bodyColor: Colors.white, displayColor: Colors.white),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.secondaryBrand,
@@ -39,7 +35,7 @@ class MainApp extends StatelessWidget {
             textStyle: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              fontFamily: GoogleFonts.quintessential().fontFamily,
+              fontFamily: GoogleFonts.caudex().fontFamily,
             ),
           ),
         ),
@@ -49,16 +45,14 @@ class MainApp extends StatelessWidget {
             textStyle: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              fontFamily: GoogleFonts.quintessential().fontFamily,
+              fontFamily: GoogleFonts.caudex().fontFamily,
             ),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
-          helperStyle: TextStyle(
-            color: Colors.black
-          ),
+          helperStyle: TextStyle(color: Colors.black),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(36.0),
             borderSide: BorderSide.none,
