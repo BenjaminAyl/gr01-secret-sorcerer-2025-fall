@@ -5,11 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/controllers/lobby_controller.dart';
-import 'package:secret_sorcerer/models/game_player.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
-import 'package:secret_sorcerer/widgets/primary_button.dart';
+import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 
 class LobbyScreen extends StatefulWidget {
   final String code;
@@ -117,7 +116,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
             centerTitle: true,
             title: const Text('Lobby', style: TextStyles.subheading),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: AppColors.customAccent),
+              icon: const Icon(
+                Icons.cancel,
+                color: AppColors.customAccent,
+                size: AppSpacing.iconSizeLarge,
+              ),
               onPressed: () => _leave(data),
             ),
           ),
@@ -138,8 +141,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ),
                   AppSpacing.gapS,
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 20,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.secondaryBrand,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusL),
@@ -170,8 +175,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   AppSpacing.gapS,
                   Column(
                     children: [
-                      Image.asset('assets/images/wizard_hat.png',
-                          width: 80, height: 80, fit: BoxFit.contain),
+                      Image.asset(
+                        'assets/images/wizard_hat.png',
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.contain,
+                      ),
                       AppSpacing.gapXS,
                       Text(
                         hostName,
@@ -246,8 +255,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
                           else
                             Text(
                               'Waiting for host to start...',
-                              style: TextStyles.body
-                                  .copyWith(color: Colors.white70),
+                              style: TextStyles.body.copyWith(
+                                color: Colors.white70,
+                              ),
                             ),
                         ],
                       ),

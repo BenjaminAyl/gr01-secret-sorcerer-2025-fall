@@ -27,7 +27,7 @@ class PillButton extends StatelessWidget {
       onPressed: onPressed,
       padding: AppSpacing.pillButton,
       radius: AppSpacing.radiusL,
-      fontSize: 14,
+      fontSize: 18,
     );
   }
 
@@ -41,8 +41,12 @@ class PillButton extends StatelessWidget {
         padding: padding,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(radius),
-        ),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusButton),
+            side: BorderSide(
+              color: AppColors.customAccent, 
+              width: 1.0, 
+            ),
+          ),
       ),
       child: Text(
         label,

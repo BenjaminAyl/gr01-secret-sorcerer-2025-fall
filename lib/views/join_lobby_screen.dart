@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
-import 'package:secret_sorcerer/widgets/primary_button.dart';
+import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
 
 class JoinLobbyScreen extends StatefulWidget {
@@ -51,6 +51,17 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryBrand,
+      appBar: AppBar(
+        backgroundColor: AppColors.primaryBrand,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.cancel,
+            color: AppColors.customAccent,
+            size: AppSpacing.iconSizeLarge,
+          ),
+          onPressed: () => context.go('/home'),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: Padding(

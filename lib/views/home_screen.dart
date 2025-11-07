@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
-import 'package:secret_sorcerer/widgets/primary_button.dart';
+import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -12,14 +12,22 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/textures/fog2.png'),
+            fit: BoxFit.cover,
+            opacity: 0.1,
+          ),
+        ),
         child: SizedBox(
           width: double.infinity,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              AppSpacing.gapL,
-              const Text('Secret Sorcerer', style: TextStyles.title),
+              AppSpacing.gapXXL,
+              AppSpacing.gapXXL,
+              Text('Secret Sorcerer', style: TextStyles.title),
               AppSpacing.spaceXXL,
 
               PrimaryButton(
@@ -67,9 +75,11 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                         AppSpacing.gapXS,
-                        const Text('RULES', style: TextStyles.body),
+                        const Text('Rules', style: TextStyles.body),
                       ],
                     ),
+                    AppSpacing.gapWL,
+                    AppSpacing.gapWL,
                     Column(
                       children: [
                         GestureDetector(
@@ -81,13 +91,14 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                         AppSpacing.gapXS,
-                        const Text('PROFILE', style: TextStyles.body),
+                        const Text('Profile', style: TextStyles.body),
                       ],
                     ),
                     AppSpacing.gapWL,
                   ],
                 ),
               ),
+              AppSpacing.gapXL
             ],
           ),
         ),

@@ -24,9 +24,9 @@ class _LoginScreenState extends State<LoginScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           spacing: 10,
           children: [
-            const Text('Secret Sorcerer', style: TextStyles.title),
+            Text('Secret Sorcerer', style: TextStyles.title),
             AppSpacing.gapL,
-            const Text('Login', style: TextStyles.heading),
+            Text('Login', style: TextStyles.title.copyWith(fontSize: 32)),
             AppSpacing.gapM,
             TextField(
               controller: _emailController,
