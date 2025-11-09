@@ -1,6 +1,6 @@
 import 'package:go_router/go_router.dart';
-import 'package:secret_sorcerer/views/edit_profile_screen.dart';
-import 'package:secret_sorcerer/views/friends_screen.dart';
+import 'package:secret_sorcerer/views/profile/edit_profile_screen.dart';
+import 'package:secret_sorcerer/views/profile/friends_screen.dart';
 import 'package:secret_sorcerer/views/join_lobby_screen.dart';
 import 'package:secret_sorcerer/views/lobby_screen.dart';
 import 'package:secret_sorcerer/views/profile/profile_screen.dart';

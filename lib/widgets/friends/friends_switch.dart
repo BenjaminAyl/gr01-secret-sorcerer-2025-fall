@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
-import 'package:secret_sorcerer/views/friends_screen.dart';
+import 'package:secret_sorcerer/views/profile/friends_screen.dart';
 
 class FriendsSwitch extends StatelessWidget {
   final FriendTab value;
