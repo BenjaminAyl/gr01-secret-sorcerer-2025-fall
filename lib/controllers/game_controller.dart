@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
 
 class GameController {
-  int countdown = 10;
+  int countdown = 60;
   final _timerStream = StreamController<int>.broadcast();
   Stream<int> get timerStream => _timerStream.stream;
 
@@ -13,7 +13,7 @@ class GameController {
 
   // Call this on the host device
   void startCountdown(String lobbyId, void Function() onComplete) {
-    countdown = 10;
+    countdown = 60;
 
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {

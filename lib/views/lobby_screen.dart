@@ -37,6 +37,29 @@ class _LobbyScreenState extends State<LobbyScreen> {
     await _lobbyController.init(widget.code);
   }
 
+  /// Cleans up when leaving or closing app
+  Future<void> _cleanupOnExit() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('lobbies')
+          .doc(widget.code)
+          .get();
+
+      if (snap.exists) {
+        final data = snap.data()!;
+        await _lobbyController.leaveLobby(data);
+      }
+    } catch (_) {
+      // ignore if already deleted
+    }
+  }
+
+  @override
+  void dispose() {
+    _cleanupOnExit();
+    super.dispose();
+  }
+
   Future<void> _leave(Map<String, dynamic> data) async {
     final isHost = data['creatorId'] == playerId;
     if (isHost) {
@@ -51,7 +74,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
   }
 
-  //Host starts the game
+  // Host starts the game
   Future<void> _start(List<String> ids) async {
     await _lobbyController.startGame(ids);
     if (mounted) context.go('/game/${widget.code}');
@@ -59,216 +82,222 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _firebase.watchLobby(widget.code),
-      builder: (context, snap) {
-        if (!snap.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+    return WillPopScope(
+      onWillPop: () async {
+        await _cleanupOnExit();
+        return true; // allow pop after cleanup
+      },
+      child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _firebase.watchLobby(widget.code),
+        builder: (context, snap) {
+          if (!snap.hasData) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
 
-        //lobby fallback
-        if (!snap.data!.exists) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) context.go('/home');
-          });
-          return const SizedBox.shrink();
-        }
+          // Lobby fallback
+          if (!snap.data!.exists) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) context.go('/home');
+            });
+            return const SizedBox.shrink();
+          }
 
-        final data = snap.data!.data()!;
-        final status = data['status'] ?? 'waiting';
-        final creatorId = data['creatorId'] as String;
-        final ids = List<String>.from((data['players'] ?? []).cast<String>());
-        final nicknames = Map<String, dynamic>.from(data['nicknames'] ?? {});
-        final isHost = creatorId == playerId;
-        final canStart = ids.length > 1;
+          final data = snap.data!.data()!;
+          final status = data['status'] ?? 'waiting';
+          final creatorId = data['creatorId'] as String;
+          final ids = List<String>.from((data['players'] ?? []).cast<String>());
+          final nicknames = Map<String, dynamic>.from(data['nicknames'] ?? {});
+          final isHost = creatorId == playerId;
+          final canStart = ids.length > 1;
 
-        //join if somehow not in players list
-        if (!_attemptedAutoJoin && !ids.contains(playerId)) {
-          _attemptedAutoJoin = true;
-          _firebase.joinLobby(widget.code, playerId);
-        }
+          // Auto-join if missing
+          if (!_attemptedAutoJoin && !ids.contains(playerId)) {
+            _attemptedAutoJoin = true;
+            _firebase.joinLobby(widget.code, playerId);
+          }
 
-        //kick everyone out of my lobby
-        if (status == 'closing') {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) context.go('/home');
-          });
-        }
+          // Close lobby → send everyone home
+          if (status == 'closing') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) context.go('/home');
+            });
+          }
 
-        //move to game screen
-        if (status == 'playing') {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) context.go('/game/${widget.code}');
-          });
-        }
+          // Move to game screen
+          if (status == 'playing') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) context.go('/game/${widget.code}');
+            });
+          }
 
-        //ALL UI
-        final hostName = nicknames[creatorId] ?? 'Host';
-        final otherPlayers = ids.where((id) => id != creatorId).toList();
+          // UI data
+          final hostName = nicknames[creatorId] ?? 'Host';
+          final otherPlayers = ids.where((id) => id != creatorId).toList();
 
-        return Scaffold(
-          backgroundColor: AppColors.primaryBrand,
-          appBar: AppBar(
+          return Scaffold(
             backgroundColor: AppColors.primaryBrand,
-            elevation: 0,
-            centerTitle: true,
-            title: const Text('Lobby', style: TextStyles.subheading),
-            leading: IconButton(
-              icon: const Icon(
-                Icons.cancel,
-                color: AppColors.customAccent,
-                size: AppSpacing.iconSizeLarge,
+            appBar: AppBar(
+              backgroundColor: AppColors.primaryBrand,
+              elevation: 0,
+              centerTitle: true,
+              title: const Text('Lobby', style: TextStyles.subheading),
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.cancel,
+                  color: AppColors.customAccent,
+                  size: AppSpacing.iconSizeLarge,
+                ),
+                onPressed: () => _leave(data),
               ),
-              onPressed: () => _leave(data),
             ),
-          ),
-          body: SafeArea(
-            child: Padding(
-              padding: AppSpacing.screen,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  //Lobby Code Banner
-                  Text(
-                    'Lobby Code:',
-                    style: TextStyles.subheading.copyWith(
-                      color: AppColors.textAccent,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 26,
-                    ),
-                  ),
-                  AppSpacing.gapS,
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 20,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondaryBrand,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-                    ),
-                    child: Text(
-                      widget.code,
-                      style: TextStyles.title.copyWith(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
+            body: SafeArea(
+              child: Padding(
+                padding: AppSpacing.screen,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Lobby Code Banner
+                    Text(
+                      'Lobby Code:',
+                      style: TextStyles.subheading.copyWith(
                         color: AppColors.textAccent,
-                        letterSpacing: 2,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 26,
                       ),
                     ),
-                  ),
-                  AppSpacing.gapL,
-
-                  //Host section
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'HOST:',
-                      style: TextStyles.bodyLarge.copyWith(
-                        color: AppColors.textAccent,
-                        fontWeight: FontWeight.bold,
+                    AppSpacing.gapS,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 20,
                       ),
-                    ),
-                  ),
-                  AppSpacing.gapS,
-                  Column(
-                    children: [
-                      Image.asset(
-                        'assets/images/wizard_hat.png',
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.contain,
+                      decoration: BoxDecoration(
+                        color: AppColors.secondaryBrand,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusL),
                       ),
-                      AppSpacing.gapXS,
-                      Text(
-                        hostName,
-                        style: TextStyles.body.copyWith(
+                      child: Text(
+                        widget.code,
+                        style: TextStyles.title.copyWith(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
                           color: AppColors.textAccent,
-                          fontWeight: FontWeight.w600,
+                          letterSpacing: 2,
                         ),
                       ),
-                    ],
-                  ),
-                  AppSpacing.gapL,
+                    ),
+                    AppSpacing.gapL,
 
-                  //Player list below host
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      child: Column(
-                        children: [
-                          if (otherPlayers.isNotEmpty)
-                            Wrap(
-                              spacing: 16,
-                              runSpacing: 16,
-                              alignment: WrapAlignment.center,
-                              children: otherPlayers.map((uid) {
-                                final name = nicknames[uid] ?? 'Unknown';
-                                return Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Image.asset(
-                                      'assets/images/wizard_hat.png',
-                                      width: 70,
-                                      height: 70,
-                                      fit: BoxFit.contain,
-                                    ),
-                                    AppSpacing.gapXS,
-                                    Text(
-                                      name,
-                                      style: TextStyles.bodySmall.copyWith(
-                                        color: AppColors.textAccent,
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            )
-                          else
-                            Text(
-                              'Waiting for players...',
-                              style: TextStyles.body.copyWith(
-                                color: Colors.white70,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          AppSpacing.spaceL,
-
-                          //Start button (host only)
-                          if (isHost)
-                            SizedBox(
-                              width: 220,
-                              height: AppSpacing.buttonHeightMedium,
-                              child: Opacity(
-                                opacity: canStart ? 1 : 0.6,
-                                child: IgnorePointer(
-                                  ignoring: !canStart,
-                                  child: PrimaryButton(
-                                    label: 'Start Game',
-                                    onPressed: () => _start(ids),
-                                  ),
-                                ),
-                              ),
-                            )
-                          else
-                            Text(
-                              'Waiting for host to start...',
-                              style: TextStyles.body.copyWith(
-                                color: Colors.white70,
-                              ),
-                            ),
-                        ],
+                    // Host section
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'HOST:',
+                        style: TextStyles.bodyLarge.copyWith(
+                          color: AppColors.textAccent,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    AppSpacing.gapS,
+                    Column(
+                      children: [
+                        Image.asset(
+                          'assets/images/wizard_hat.png',
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.contain,
+                        ),
+                        AppSpacing.gapXS,
+                        Text(
+                          hostName,
+                          style: TextStyles.body.copyWith(
+                            color: AppColors.textAccent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    AppSpacing.gapL,
+
+                    // Player list
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          children: [
+                            if (otherPlayers.isNotEmpty)
+                              Wrap(
+                                spacing: 16,
+                                runSpacing: 16,
+                                alignment: WrapAlignment.center,
+                                children: otherPlayers.map((uid) {
+                                  final name = nicknames[uid] ?? 'Unknown';
+                                  return Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Image.asset(
+                                        'assets/images/wizard_hat.png',
+                                        width: 70,
+                                        height: 70,
+                                        fit: BoxFit.contain,
+                                      ),
+                                      AppSpacing.gapXS,
+                                      Text(
+                                        name,
+                                        style: TextStyles.bodySmall.copyWith(
+                                          color: AppColors.textAccent,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              )
+                            else
+                              Text(
+                                'Waiting for players...',
+                                style: TextStyles.body.copyWith(
+                                  color: Colors.white70,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            AppSpacing.spaceL,
+
+                            // Start button (host only)
+                            if (isHost)
+                              SizedBox(
+                                width: 220,
+                                height: AppSpacing.buttonHeightMedium,
+                                child: Opacity(
+                                  opacity: canStart ? 1 : 0.6,
+                                  child: IgnorePointer(
+                                    ignoring: !canStart,
+                                    child: PrimaryButton(
+                                      label: 'Start Game',
+                                      onPressed: () => _start(ids),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else
+                              Text(
+                                'Waiting for host to start...',
+                                style: TextStyles.body.copyWith(
+                                  color: Colors.white70,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

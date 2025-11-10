@@ -24,6 +24,6 @@ class AppUser {
         'uid': uid,
         'email': email,
         'username': username,
-        'nickame': nickname,
+        'nickname': nickname,
       };
 }

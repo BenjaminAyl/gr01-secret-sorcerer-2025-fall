@@ -27,7 +27,7 @@ class GameState {
     charms = 0;
     curses = 0;
     players = _players;
-    deck = (List.filled(10, 'curse') + List.filled(10, 'charm'))..shuffle();
+    deck = (List.filled(10, 'curse') + List.filled(7, 'charm'))..shuffle();
     headmasterIdx = 0;
     headmaster = players[headmasterIdx].username;
   }

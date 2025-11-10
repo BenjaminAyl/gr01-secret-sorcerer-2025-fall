@@ -28,6 +28,6 @@ flutter:
   assets:
     - assets/images/tome.png
     - assets/images/wizard_hat.png
+    - assets/images/game-assets/board/
     - assets/textures/fog.png
     - assets/textures/fog2.png
-    

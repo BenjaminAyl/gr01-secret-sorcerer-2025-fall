@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:secret_sorcerer/constants/app_colours.dart';
+import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/controllers/game_controller.dart';
 import 'package:secret_sorcerer/views/game_view.dart';
@@ -21,13 +23,15 @@ class _GameScreenState extends State<GameScreen> {
   late final WizardGameView _game;
   String? _creatorId;
   String? _uid;
-  bool _navigatedOut = false; //no double navigation
+  bool _navigatedOut = false;
 
   @override
   void initState() {
     super.initState();
     _uid = FirebaseAuth.instance.currentUser?.uid;
-    _game = WizardGameView();
+    final myUid = _uid ?? "unknown";
+    _game = WizardGameView(lobbyId: widget.code, myUid: myUid);
+
   }
 
   @override
@@ -36,17 +40,14 @@ class _GameScreenState extends State<GameScreen> {
     super.dispose();
   }
 
-  ///Host-only timer start
   void _maybeStartHostTimer() {
     if (_creatorId != null && _uid == _creatorId) {
-      _controller.startCountdown(widget.code, () {
-        //Host triggers Firestore reset through endGame()
-      });
+      _controller.startCountdown(widget.code, () {});
     }
   }
 
   void _goBackToLobby() {
-    if (_navigatedOut || !mounted) return;  //no duplicates
+    if (_navigatedOut || !mounted) return;
     _navigatedOut = true;
     context.go('/lobby/${widget.code}');
   }
@@ -66,8 +67,6 @@ class _GameScreenState extends State<GameScreen> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-
-        // Lobby deleted → everyone goes home
         if (!lobbySnap.data!.exists) {
           WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
           return const SizedBox.shrink();
@@ -77,7 +76,6 @@ class _GameScreenState extends State<GameScreen> {
         _creatorId ??= lobby['creatorId'] as String?;
         final status = lobby['status'];
 
-        // Lobby reset → go back to lobby
         if (status == 'waiting') {
           WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
         }
@@ -93,7 +91,6 @@ class _GameScreenState extends State<GameScreen> {
               );
             }
 
-            // Game state deleted → end of round → return to lobby
             if (!stateSnap.data!.exists) {
               WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
               return const SizedBox.shrink();
@@ -105,44 +102,115 @@ class _GameScreenState extends State<GameScreen> {
             _game.updateCountdown(time);
 
             return Scaffold(
-              backgroundColor: Colors.black,
-              body: Stack(
-                children: [
-                  GameWidget(game: _game),
-                  //HUD overlay for timer and info
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    top: 48,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Lobby: ${widget.code}',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Text(
-                          'Phase: $phase',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Time: $time',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
+              backgroundColor: AppColors.primaryBrand,
+              body: SafeArea(
+                child: Stack(
+                  children: [
+                    GameWidget(
+                      game: _game,
+                      overlayBuilderMap: {
+                        'ControlsOverlay': (context, game) {
+                          final g = game as WizardGameView;
+                          final isHM = g.isHeadmasterClient;
+                          final isSC = g.isSpellcasterClient;
+                          final hasSC = g.spellcasterIndex != null;
+
+                          return Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.only(bottom: 40, left: 16, right: 16),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.secondaryBrand.withOpacity(0.7),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Text(
+                                      isHM
+                                          ? 'You are the Headmaster'
+                                          : isSC
+                                              ? 'You are the Spellcaster'
+                                              : 'Waiting for others...',
+                                      style: TextStyles.bodySmall.copyWith(
+                                        color: AppColors.textAccent,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  if (isSC)
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.tealAccent,
+                                            foregroundColor: Colors.black,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(30),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 32, vertical: 16),
+                                          ),
+                                          onPressed: () => g.castSpell(true),
+                                          child: const Text('Charm',
+                                              style: TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w600)),
+                                        ),
+                                        const SizedBox(width: 20),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.redAccent,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(30),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 32, vertical: 16),
+                                          ),
+                                          onPressed: () => g.castSpell(false),
+                                          child: const Text('Curse',
+                                              style: TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w600)),
+                                        ),
+                                      ],
+                                    )
+                                  else if (isHM && !hasSC)
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.customAccent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(30),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 40, vertical: 16),
+                                      ),
+                                      onPressed: () => g.endTurn(),
+                                      child: const Text('End Turn',
+                                          style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white)),
+                                    )
+                                  else
+                                    const SizedBox(height: 60),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      },
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },

@@ -28,10 +28,7 @@ class LobbyController {
   }
 
   Future<void> startGame(List<String> ids) async {
-    final players = ids
-        .map((id) => GamePlayer(username: 'Wizard_$id', role: 'unknown'))
-        .toList();
-    await _firebase.startGame(lobbyId, players);
+    await _firebase.startGame(lobbyId, ids);
   }
 
   Future<void> resetLobby() async {
