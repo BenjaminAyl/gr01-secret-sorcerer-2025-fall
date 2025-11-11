@@ -67,10 +67,24 @@ class _GameScreenState extends State<GameScreen> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (!lobbySnap.data!.exists) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
+        if (!lobbySnap.hasData || lobbySnap.hasError) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (lobbySnap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final lobbyData = lobbySnap.data?.data();
+        if (lobbyData == null) {
+          // Don't auto-redirect yet; wait for next event.
           return const SizedBox.shrink();
         }
+
 
         final lobby = lobbySnap.data!.data()!;
         _creatorId ??= lobby['creatorId'] as String?;
@@ -183,25 +197,6 @@ class _GameScreenState extends State<GameScreen> {
                                         ),
                                       ],
                                     )
-                                  else if (isHM && !hasSC)
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.customAccent,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(30),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 40, vertical: 16),
-                                      ),
-                                      onPressed: () => g.endTurn(),
-                                      child: const Text('End Turn',
-                                          style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white)),
-                                    )
-                                  else
-                                    const SizedBox(height: 60),
                                 ],
                               ),
                             ),

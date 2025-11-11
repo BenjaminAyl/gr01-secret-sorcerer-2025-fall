@@ -23,6 +23,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   final _lobbyController = LobbyController();
   late String playerId;
   bool _attemptedAutoJoin = false;
+  bool _isStartingGame = false;
 
   @override
   void initState() {
@@ -40,6 +41,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   /// Cleans up when leaving or closing app
   Future<void> _cleanupOnExit() async {
     try {
+      if(_isStartingGame) return;
       final snap = await FirebaseFirestore.instance
           .collection('lobbies')
           .doc(widget.code)
@@ -56,7 +58,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   void dispose() {
-    _cleanupOnExit();
+    // 🚫 Don’t clean up if game is starting
+    if (mounted) {
+      final route = GoRouterState.of(context).uri.toString();
+      if (!route.contains('/game')) {
+        _cleanupOnExit();
+      }
+    }
     super.dispose();
   }
 
@@ -76,9 +84,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   // Host starts the game
   Future<void> _start(List<String> ids) async {
+    _isStartingGame = true;
     await _lobbyController.startGame(ids);
     if (mounted) context.go('/game/${widget.code}');
   }
+
 
   @override
   Widget build(BuildContext context) {

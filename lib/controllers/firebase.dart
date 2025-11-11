@@ -119,6 +119,24 @@ class FirebaseController {
       'spellcaster': uid,
     });
   }
+  Future<void> _rotateHeadmaster(String lobbyId) async {
+    final stateRef = _firestore.collection('states').doc(lobbyId);
+    final doc = await stateRef.get();
+    final data = doc.data() ?? {};
+
+    final players = (data['players'] as List?) ?? [];
+    if (players.isEmpty) return;
+
+    final currentIdx = (data['headmasterIdx'] ?? 0) as int;
+    final nextIdx = (currentIdx + 1) % players.length;
+    final nextUid = players[nextIdx]['username'] ?? '';
+
+    await stateRef.update({
+      'headmasterIdx': nextIdx,
+      'headmaster': nextUid,
+      'spellcaster': null,
+    });
+  }
 
   Future<void> incrementCharm(String lobbyId) async {
     final stateRef = _firestore.collection('states').doc(lobbyId);
@@ -126,10 +144,8 @@ class FirebaseController {
     final data = doc.data() ?? {};
     final current = (data['charms'] ?? 0) as int;
 
-    await stateRef.update({
-      'charms': current + 1,
-      'spellcaster': null,
-    });
+    await stateRef.update({'charms': current + 1});
+    await _rotateHeadmaster(lobbyId);
   }
 
   Future<void> incrementCurse(String lobbyId) async {
@@ -138,9 +154,8 @@ class FirebaseController {
     final data = doc.data() ?? {};
     final current = (data['curses'] ?? 0) as int;
 
-    await stateRef.update({
-      'curses': current + 1,
-      'spellcaster': null,
-    });
+    await stateRef.update({'curses': current + 1});
+    await _rotateHeadmaster(lobbyId);
   }
+
 }
