@@ -14,6 +14,7 @@ dependencies:
   firebase_auth: ^6.1.1
   google_fonts: ^6.3.2
   flame: ^1.33.0
+  flame_audio: ^2.11.11
   cloud_firestore: ^6.0.3
   hive: ^2.2.3
   hive_flutter: ^1.1.0
@@ -31,3 +32,7 @@ flutter:
     - assets/images/game-assets/board/
     - assets/textures/fog.png
     - assets/textures/fog2.png
+    - assets/images/game-assets/board/charmCard.png
+    - assets/images/game-assets/board/curseCard.png
+    - assets/audio/TavernMusic.wav
+    - assets/audio/TavernLobbyMusic.wav

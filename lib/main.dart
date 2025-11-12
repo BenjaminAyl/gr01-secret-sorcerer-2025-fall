@@ -7,6 +7,8 @@ import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/firebase_options.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
+
 
 final userAuth = UserAuth();
 
@@ -14,6 +16,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await Hive.initFlutter();
+  await AudioHelper.init();
   runApp(const MainApp());
 }
 

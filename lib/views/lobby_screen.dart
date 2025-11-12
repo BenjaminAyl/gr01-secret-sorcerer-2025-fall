@@ -9,6 +9,8 @@ import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
+
 
 class LobbyScreen extends StatefulWidget {
   final String code;
@@ -29,6 +31,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
   void initState() {
     super.initState();
     _initLobby();
+
+    //Start lobby music on entry
+    Future.microtask(() async {
+    await AudioHelper.fadeTo('TavernLobbyMusic.wav', delayMs: 1500);
+  });
+
   }
 
   Future<void> _initLobby() async {
@@ -58,7 +66,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   void dispose() {
-    // 🚫 Don’t clean up if game is starting
+    //Stop music when leaving
+    AudioHelper.stop();
+
+    // existing cleanup
     if (mounted) {
       final route = GoRouterState.of(context).uri.toString();
       if (!route.contains('/game')) {

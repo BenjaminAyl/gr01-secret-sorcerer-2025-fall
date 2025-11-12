@@ -16,12 +16,16 @@ class WizardGameView extends FlameGame with TapCallbacks {
   final FirebaseController _firebase = FirebaseController();
 
   List<GamePlayer> players = [];
-  Map<String, String> nicknameCache = {}; // uid → nickname
+  Map<String, String> nicknameCache = {}; // uid to nickname
   int headmasterIndex = 0;
   int? spellcasterIndex;
   int charms = 0;
   int curses = 0;
   int countdown = 0;
+
+  //live phase and pending cards for UI
+  String phase = 'start';
+  List<String> pendingCards = []; 
 
   SpriteComponent? baseBoard;
   SpriteComponent? charmsRing;
@@ -53,7 +57,6 @@ class WizardGameView extends FlameGame with TapCallbacks {
     camera.viewfinder.position = canvasSize / 2;
   }
 
-  // --- BOARD SETUP ---
   Future<void> _loadBoard() async {
     add(RectangleComponent(
       size: size,
@@ -71,12 +74,8 @@ class WizardGameView extends FlameGame with TapCallbacks {
       priority: -3,
     );
     add(baseBoard!);
-
-    // Remove any color effect here since you don’t want the base board tinted
-    // (So we won’t add a ColorEffect to baseBoard)
   }
 
-  // --- STATE LISTENERS ---
   void _subscribeGameState() {
     FirebaseFirestore.instance
         .collection('states')
@@ -89,7 +88,6 @@ class WizardGameView extends FlameGame with TapCallbacks {
     });
   }
 
-  // --- SYNC AND PLAYER SETUP ---
   Future<void> _syncFromData(Map<String, dynamic> data) async {
     final rawPlayers = (data['players'] as List?) ?? [];
     players = rawPlayers
@@ -112,6 +110,9 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
     charms = (data['charms'] ?? 0) as int;
     curses = (data['curses'] ?? 0) as int;
+    phase = (data['phase'] ?? 'start').toString();
+    print("🔥 Phase: $phase | pendingCards: $pendingCards | owner: ${data['pendingOwner']}");
+    pendingCards = List<String>.from((data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
 
     await _resolveNicknames();
 
@@ -129,7 +130,6 @@ class WizardGameView extends FlameGame with TapCallbacks {
     for (final p in players) {
       final uid = p.username;
       if (nicknameCache.containsKey(uid)) continue;
-
       try {
         final doc = await usersRef.doc(uid).get();
         if (doc.exists) {
@@ -145,7 +145,6 @@ class WizardGameView extends FlameGame with TapCallbacks {
     }
   }
 
-  // --- DRAW PLAYER HATS ---
   void _placeHats() {
     for (final h in hats) {
       h.removeFromParent();
@@ -156,12 +155,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
     final n = players.length;
     final baseRadius = min(size.x, size.y) * 0.45;
-    final radius = n <= 4
-        ? baseRadius * 1.1
-        : n <= 6
-            ? baseRadius * 1.3
-            : baseRadius * 1.4;
-
+    final radius = n <= 4 ? baseRadius * 1.25 : (n <= 6 ? baseRadius * 1.35 : baseRadius * 1.45);
     final center = Vector2(size.x / 2, size.y / 2.2);
 
     for (int i = 0; i < n; i++) {
@@ -176,31 +170,29 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
       final hat = PlayerHatComponent(i, nickname, _onHatTapped)
         ..position = pos
-        ..scale = Vector2.all(1.2); // increased size
+        ..scale = Vector2.all(1.2);
       add(hat);
       hats.add(hat);
     }
   }
 
-  // --- HAT TAP HANDLER ---
   Future<void> _onHatTapped(int index) async {
     if (!isHeadmasterClient) return;
     if (index == headmasterIndex) return;
+    // Choosing the SC automatically triggers HM's draw on the server.
     await _firebase.updateSpellcaster(lobbyId, players[index].username);
   }
 
-  // --- GAME ACTIONS ---
   void updateCountdown(int seconds) => countdown = seconds;
 
-  Future<void> castSpell(bool isCharm) async {
-    if (!isSpellcasterClient) return;
-    if (isCharm) {
-      await _firebase.incrementCharm(lobbyId);
-      _flashRing(color: Colors.tealAccent);
-    } else {
-      await _firebase.incrementCurse(lobbyId);
-      _flashRing(color: Colors.redAccent);
-    }
+  // HM discards 1 of 3
+  Future<void> headmasterDiscard(int index) async {
+    await _firebase.headmasterDiscard(lobbyId, index);
+  }
+
+  // SC enacts 1 of 2
+  Future<void> spellcasterChoose(int index) async {
+    await _firebase.spellcasterChoose(lobbyId, index);
   }
 
   int? _prevHeadmaster;
@@ -255,7 +247,6 @@ class WizardGameView extends FlameGame with TapCallbacks {
     final ringSize = min(size.x, size.y) * 0.7;
     final center = Vector2(size.x / 2, size.y / 2.2);
 
-    // --- CHARM RING ---
     if (charms > 0) {
       if (charms != _prevCharmLevel) {
         charmsRing?.removeFromParent();
@@ -270,13 +261,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
           priority: -2,
         )..opacity = 0.0;
 
-        charmsRing!.add(
-          OpacityEffect.to(
-            1.0,
-            EffectController(duration: 0.8),
-          ),
-        );
-
+        charmsRing!.add(OpacityEffect.to(1.0, EffectController(duration: 0.8)));
         add(charmsRing!);
         _prevCharmLevel = charms;
       }
@@ -285,7 +270,6 @@ class WizardGameView extends FlameGame with TapCallbacks {
       _prevCharmLevel = 0;
     }
 
-    // --- CURSE RING ---
     if (curses > 0) {
       if (curses != _prevCurseLevel) {
         cursesRing?.removeFromParent();
@@ -300,13 +284,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
           priority: -1,
         )..opacity = 0.0;
 
-        cursesRing!.add(
-          OpacityEffect.to(
-            1.0,
-            EffectController(duration: 0.8),
-          ),
-        );
-
+        cursesRing!.add(OpacityEffect.to(1.0, EffectController(duration: 0.8)));
         add(cursesRing!);
         _prevCurseLevel = curses;
       }
@@ -315,7 +293,6 @@ class WizardGameView extends FlameGame with TapCallbacks {
       _prevCurseLevel = 0;
     }
   }
-
 
   void _flashRing({required Color color}) {
     final ring = CircleComponent(
@@ -333,7 +310,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
   }
 }
 
-// --- PLAYER HAT CLASS ---
+// --- PLAYER HAT CLASS (unchanged) ---
 class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   final int index;
   final String nickname;
@@ -341,26 +318,23 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   late TextComponent label;
 
   PlayerHatComponent(this.index, this.nickname, this.onTap)
-      : super(size: Vector2.all(60), anchor: Anchor.center); // bigger base size
+      : super(size: Vector2.all(60), anchor: Anchor.center);
 
   @override
   Future<void> onLoad() async {
     sprite = await Sprite.load('wizard_hat.png');
-
-    // Add label AFTER sprite so it sits above all other children
     label = TextComponent(
       text: nickname,
       textRenderer: TextPaint(
         style: TextStyles.bodySmall.copyWith(
-          fontSize: 15,
+          fontSize: 14,
           color: const Color.fromARGB(121, 255, 255, 255),
         ),
       ),
       anchor: Anchor.topCenter,
-      position: Vector2(size.x / 2, size.y + 12), // increased offset
+      position: Vector2(size.x / 2, size.y + 12),
       priority: 5,
     );
-
     add(label);
   }
 
@@ -372,17 +346,14 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   void onTapDown(TapDownEvent event) => onTap(index);
 
   void removeEffect<T extends Effect>() {
-    // safely remove previous effects (Flame doesn’t support effects list directly)
     children.whereType<T>().toList().forEach((effect) {
       effect.removeFromParent();
     });
   }
 
-  // optional: update label position dynamically if scaled externally
   @override
   void onMount() {
     super.onMount();
     label.position = Vector2(size.x / 2, size.y + 12);
   }
 }
-
