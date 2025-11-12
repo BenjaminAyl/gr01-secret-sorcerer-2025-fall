@@ -14,6 +14,10 @@ class GameState {
 
   late List<GamePlayer> players = [];
 
+  late List<String> discard = [];
+  
+  late List<String> pendingCards = [];
+
   late List<String> deck = [];
 
   late int headmasterIdx = 0;
@@ -28,6 +32,8 @@ class GameState {
     curses = 0;
     players = _players;
     deck = (List.filled(10, 'curse') + List.filled(7, 'charm'))..shuffle();
+    discard = [];
+    pendingCards = [];
     headmasterIdx = 0;
     headmaster = players[headmasterIdx].username;
   }
@@ -41,6 +47,8 @@ class GameState {
       'spellcaster': spellcaster,
       'players': players.map((p) => p.toMap()).toList(),
       'deck': deck,
+      'discard': discard,
+      'pendingCards': pendingCards,
       'headmasterIdx': headmasterIdx,
       'lastHeadmaster': lastHeadmaster,
       'lastSpellcaster': lastSpellcaster,
