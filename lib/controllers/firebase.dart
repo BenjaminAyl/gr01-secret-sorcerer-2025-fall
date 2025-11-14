@@ -7,7 +7,7 @@ import 'dart:math';
 class FirebaseController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // ---------------- AUTH ----------------
+  //Auth gate
   Future<UserCredential> signUp(String email, String password) async {
     return await FirebaseAuth.instance.createUserWithEmailAndPassword(
       email: email,
@@ -24,7 +24,7 @@ class FirebaseController {
 
   User? get currentUser => FirebaseAuth.instance.currentUser;
 
-  // ---------------- LOBBY ----------------
+  //Lobby MANAGEMENT
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchLobby(String lobbyId) =>
       _firestore.collection('lobbies').doc(lobbyId).snapshots();
 
@@ -36,7 +36,7 @@ class FirebaseController {
     final code = randomInt.toString();
     final lobbyRef = _firestore.collection('lobbies').doc(code);
 
-    // ✅ lowercase key fix
+    //lowercase key fix
     final userDoc = await _firestore.collection('users').doc(user.uid).get();
     final userData = userDoc.data() ?? {};
     final nickname = userData['Nickname'] ?? 'Unknown';
@@ -57,7 +57,7 @@ class FirebaseController {
 
     final userDoc = await _firestore.collection('users').doc(playerId).get();
     final userData = userDoc.data() ?? {};
-    final nickname = userData['Nickname'] ?? 'Unknown'; // ✅ lowercase fix
+    final nickname = userData['Nickname'] ?? 'Unknown'; //lowercase fix
 
     await lobbyRef.update({
       'players': FieldValue.arrayUnion([playerId]),
@@ -86,7 +86,7 @@ class FirebaseController {
     });
   }
 
-  // ---------------- GAME ----------------
+  //Start game entrance
   Future<void> startGame(String lobbyId, List<String> playerIds) async {
     final stateRef = _firestore.collection('states').doc(lobbyId);
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
@@ -102,7 +102,7 @@ class FirebaseController {
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchGame(String lobbyId) =>
       _firestore.collection('states').doc(lobbyId).snapshots();
 
-  // ---------------- GAME ACTIONS (turn order etc.) ----------------
+  //GAME ACTIONS (turn order etc)
   Future<void> updateHeadmaster(String lobbyId, int index, String uid) async {
     await _firestore.collection('states').doc(lobbyId).update({
       'headmasterIdx': index,
@@ -114,12 +114,123 @@ class FirebaseController {
     });
   }
 
-  Future<void> updateSpellcaster(String lobbyId, String uid) async {
+  Future<void> nominateSpellcaster(String lobbyId, String nomineeUid) async {
     final ref = _firestore.collection('states').doc(lobbyId);
-    // Set SC, then immediately draw for HM
-    await ref.update({'spellcaster': uid});
-    await _drawForHeadmaster(lobbyId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      final phase = data['phase'];
+      final headmaster = data['headmaster'];
+
+      // Can only nominate from 'start' (or any phase you want to allow nomination from)
+      if (phase != 'start') return;
+      if (nomineeUid == headmaster) return;
+
+      tx.update(ref, {
+        'spellcasterNominee': nomineeUid,
+        'spellcaster': null,
+        'votes': <String, String>{},  // clear previous votes
+        'phase': 'voting',
+        'pendingCards': [],
+        'pendingOwner': null,
+      });
+    });
   }
+  Future<void> castVote(String lobbyId, String voterUid, bool approve) async {
+  final ref = _firestore.collection('states').doc(lobbyId);
+
+  bool becameResultsPhase = false;
+  bool passed = false;
+
+  await _firestore.runTransaction((tx) async {
+    final snap = await tx.get(ref);
+    if (!snap.exists) return;
+
+    final data = snap.data()!;
+    final phase = data['phase'];
+    if (phase != 'voting') return;
+
+    final players = List<Map<String, dynamic>>.from((data['players'] as List?) ?? []);
+    if (players.isEmpty) return;
+
+    final headmaster = (data['headmaster'] ?? '') as String;
+    final nominee = (data['spellcasterNominee'] ?? '') as String;
+    if (nominee.isEmpty) return;
+
+    if (voterUid == headmaster) return; // HM does not vote
+
+    final votes = Map<String, String>.from((data['votes'] as Map?) ?? {});
+    if (votes.containsKey(voterUid)) return; // no double voting
+
+    votes[voterUid] = approve ? 'yes' : 'no';
+
+    // Eligible voters = everyone except HM
+    final eligible = players.map((p) => (p['username'] ?? '') as String).where((u) => u != headmaster).toList();
+    final totalNeeded = eligible.length;
+
+    if (votes.length >= totalNeeded) {
+      final yesCount = votes.values.where((v) => v == 'yes').length;
+      final noCount  = totalNeeded - yesCount;
+      passed = yesCount > noCount;
+
+      // Show results on-screen: keep votes & nominee for a brief window
+      tx.update(ref, {
+        'phase': 'voting_results',
+        'votes': votes,                   // keep so UI can render who voted what
+        'votePassed': passed,             // optional helper flag for UI/logs
+        // keep 'spellcasterNominee' so we can still show the elected name in results
+      });
+      becameResultsPhase = true;
+    } else {
+      // Still voting
+      tx.update(ref, {'votes': votes});
+    }
+  });
+
+  // If we just switched to results - pause briefly so clients can show the tally.
+  if (becameResultsPhase) {
+    await Future.delayed(const Duration(seconds: 8));
+
+    final after = await _firestore.collection('states').doc(lobbyId).get();
+    final d = after.data();
+    if (d == null) return;
+
+    // If something else already advanced the phase, bail.
+    if (d['phase'] != 'voting_results') return;
+
+    if (passed) {
+      // Commit the spellcaster, clear votes/nominee, then draw for HM
+      final nominee = (d['spellcasterNominee'] ?? '') as String;
+      if (nominee.isNotEmpty) {
+        await _firestore.collection('states').doc(lobbyId).update({
+          'spellcaster': nominee,
+          'spellcasterNominee': null,
+          'votes': <String, String>{},
+          'votePassed': FieldValue.delete(),
+          'phase': 'start',           // _drawForHeadmaster will set 'hm_discard'
+          'pendingCards': [],
+          'pendingOwner': null,
+        });
+        await _drawForHeadmaster(lobbyId);
+      }
+    } else {
+      // Failed election: clear votes/nominee, show resolving, then rotate HM
+      await _firestore.collection('states').doc(lobbyId).update({
+        'spellcaster': null,
+        'spellcasterNominee': null,
+        'votes': <String, String>{},
+        'votePassed': FieldValue.delete(),
+        'phase': 'resolving',
+        'pendingCards': [],
+        'pendingOwner': null,
+      });
+      await _rotateHeadmaster(lobbyId);
+     }
+   }
+ }
 
   Future<void> _rotateHeadmaster(String lobbyId) async {
     final stateRef = _firestore.collection('states').doc(lobbyId);

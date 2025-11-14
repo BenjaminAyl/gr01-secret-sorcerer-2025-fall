@@ -10,7 +10,6 @@ import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/views/game_view.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
 
-
 class GameScreen extends StatefulWidget {
   final String code;
   const GameScreen({super.key, required this.code});
@@ -26,16 +25,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   String? _uid;
   bool _navigatedOut = false;
 
+  //local “I clicked” flag so the UI confirms instantly
+  bool _myVoteCastLocal = false;
+
   @override
   void initState() {
     super.initState();
-    
+
     _uid = FirebaseAuth.instance.currentUser?.uid;
     final myUid = _uid ?? "unknown";
     _game = WizardGameView(lobbyId: widget.code, myUid: myUid);
 
     // Switch from lobby music to game music
-    
     AudioHelper.crossfade('TavernMusic.wav');
   }
 
@@ -65,16 +66,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         final lobby = lobbySnap.data!.data()!;
         _creatorId ??= lobby['creatorId'] as String?;
         final status = lobby['status'];
-      
+
         return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: stateRef.snapshots(),
           builder: (context, stateSnap) {
             if (!stateSnap.hasData) {
               return const Scaffold(
-                body: Center(child: CircularProgressIndicator()));
+                  body: Center(child: CircularProgressIndicator()));
             }
 
-            // If state doc was deleted → return to lobby
+            // If state doc was deleted then go return to lobby
             if (!stateSnap.data!.exists) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted && !_navigatedOut) {
@@ -90,9 +91,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               return const SizedBox.shrink();
             }
 
-            // Safety: sometimes phase might not be set yet
+            // Safety sometimes phase might not be set yet
             final phase = rawState['phase'] ?? 'start';
             _game.phase = phase;
+
+            // Reset optimistic flag when voting ends
+            if (phase != 'voting' && phase != 'voting_results' && _myVoteCastLocal) {
+              _myVoteCastLocal = false;
+            }
+
 
             return Scaffold(
               backgroundColor: AppColors.primaryBrand,
@@ -106,10 +113,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           final g = game as WizardGameView;
                           final isHM = g.isHeadmasterClient;
                           final isSC = g.isSpellcasterClient;
+
                           final showHMDiscard =
-                              isHM && g.phase == 'hm_discard' && g.pendingCards.length == 3;
+                              isHM &&
+                                  g.phase == 'hm_discard' &&
+                                  g.pendingCards.length == 3;
+
                           final showSCChoose =
-                              isSC && g.phase == 'sc_choose' && g.pendingCards.length == 2;
+                              isSC &&
+                                  g.phase == 'sc_choose' &&
+                                  g.pendingCards.length == 2;
+
+                          final showVoting = 
+                              (g.phase == 'voting' || g.phase == 'voting_results') && !isHM;
+
 
                           // Responsive card builder with staggered fade/scale
                           Widget cardWidget(String type, VoidCallback onTap, int index) {
@@ -191,9 +208,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                       ),
                                       SizedBox(height: height * 0.02),
                                       SizedBox(
-                                        width: width * 0.9, // keep margin each side
+                                        width: width * 0.9,
                                         child: FittedBox(
-                                          fit: BoxFit.scaleDown, // shrink if needed
+                                          fit: BoxFit.scaleDown,
                                           child: Row(
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             children: List.generate(cards.length, (i) {
@@ -209,10 +226,243 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                           ),
                                         ),
                                       ),
-
                                     ],
                                   ),
                                 ),
+                              ),
+                            );
+                          }
+
+                          String nomineeName() {
+                            if (g.nomineeIndex == null ||
+                                g.nomineeIndex! < 0 ||
+                                g.nomineeIndex! >= g.players.length) {
+                              return 'the Spellcaster';
+                            }
+                            final uid = g.players[g.nomineeIndex!].username;
+                            return g.nicknameCache[uid] ?? 'the Spellcaster';
+                          }
+
+                          // Simple line showing who voted what
+                          Widget voteRow(String name, bool yes) {
+                            return Padding(
+                              padding: EdgeInsets.symmetric(vertical: height * 0.006),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    yes ? Icons.check_circle : Icons.cancel,
+                                    color: yes ? Colors.greenAccent : Colors.redAccent,
+                                    size: height * 0.022,
+                                  ),
+                                  SizedBox(width: width * 0.02),
+                                  Text(
+                                    name,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: height * 0.02,
+                                    ),
+                                  ),
+                                  SizedBox(width: width * 0.02),
+                                  Text(
+                                    yes ? 'Yes' : 'No',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: height * 0.018,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          Widget buildVoteOverlay() {
+                            final cardH = height * 0.2;
+                            final cardW = width * 0.28;
+
+                            // Optimistic “I voted” (local) OR confirmed from Firestore
+                            final iVotedNow = _myVoteCastLocal || g.iVoted;
+                            final allIn = g.allVotesIn || g.phase == 'voting_results';
+
+                            // Build tallies and names when all votes are in
+                            List<Widget> results = [];
+                            if (allIn) {
+                              int yesCount = 0;
+                              int noCount = 0;
+                              g.votes.forEach((uid, val) {
+                                final name = g.nicknameCache[uid] ?? 'Wizard';
+                                results.add(voteRow(name, val));
+                                if (val) {
+                                  yesCount++;
+                                } else {
+                                  noCount++;
+                                }
+                              });
+
+                              final passed = yesCount > noCount;
+                              results.add(SizedBox(height: height * 0.02));
+                              results.add(
+                                Text(
+                                  passed
+                                      ? 'Election Passed'
+                                      : 'Election Failed',
+                                  style: TextStyle(
+                                    color: passed ? Colors.greenAccent : Colors.redAccent,
+                                    fontSize: height * 0.024,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              );
+                            }
+
+                            Widget voteCard(String asset, VoidCallback onTap, int index, {String label = ''}) {
+                              return _StaggerFadeScale(
+                                delayMs: 150 * index,
+                                durationMs: 420,
+                                beginScale: 0.92,
+                                endScale: 1.0,
+                                child: InkWell(
+                                  onTap: () async {
+                                    if (iVotedNow) return;
+                                    setState(() => _myVoteCastLocal = true); // instant feedback
+                                    await g.castVote(asset.contains('yes'));
+                                  },
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        margin: EdgeInsets.symmetric(horizontal: width * 0.02),
+                                        padding: EdgeInsets.all(width * 0.02),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.white24),
+                                        ),
+                                        child: Image.asset(
+                                          asset,
+                                          height: cardH,
+                                          width: cardW,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                      if (label.isNotEmpty) SizedBox(height: height * 0.008),
+                                      if (label.isNotEmpty)
+                                        Text(
+                                          label,
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: height * 0.018,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+
+                            // Three states on the SAME dark overlay:
+                            // 1) Not voted yet -> show Yes/No cards
+                            // 2) Voted but not all in -> “Vote has been cast”
+                            // 3) All in -> show tally + result
+                            Widget inner;
+                            if (!iVotedNow && !allIn) {
+                              inner = Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Vote to elect ${nomineeName()} as Spellcaster',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: height * 0.026,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  SizedBox(height: height * 0.018),
+                                  Text(
+                                    'Choose wisely, wizard…',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: height * 0.018,
+                                    ),
+                                  ),
+                                  SizedBox(height: height * 0.03),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      voteCard(
+                                        'assets/images/game-assets/board/yesCard.png',
+                                        () {}, // handled in onTap above
+                                        0,
+                                        label: 'Yes',
+                                      ),
+                                      voteCard(
+                                        'assets/images/game-assets/board/noCard.png',
+                                        () {}, // handled in onTap above
+                                        1,
+                                        label: 'No',
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              );
+                            } else if (iVotedNow && !allIn) {
+                              inner = Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.how_to_vote, color: Colors.white70, size: height * 0.06),
+                                  SizedBox(height: height * 0.015),
+                                  Text(
+                                    'Vote has been cast — waiting for others…',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: height * 0.022,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SizedBox(height: height * 0.01),
+                                  Text(
+                                    '${g.votedCount}/${g.eligibleVoters} votes in',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: height * 0.018,
+                                    ),
+                                  ),
+                                  SizedBox(height: height * 0.02),
+                                  const CircularProgressIndicator(color: Colors.white70),
+                                ],
+                              );
+                            } else {
+                              // allIn == true
+                              inner = Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Voting Results',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: height * 0.026,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  SizedBox(height: height * 0.02),
+                                  ...results,
+                                  SizedBox(height: height * 0.02),
+                                  Text(
+                                    'Continuing…',
+                                    style: TextStyle(color: Colors.white60, fontSize: height * 0.016),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return AnimatedOpacity(
+                              opacity: 1,
+                              duration: const Duration(milliseconds: 300),
+                              child: Container(
+                                width: double.infinity,
+                                height: double.infinity,
+                                color: Colors.black.withOpacity(0.68),
+                                child: Center(child: inner),
                               ),
                             );
                           }
@@ -269,11 +519,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                             .delete();
 
                                         await _firebase.resetLobby(widget.code);
-
-                                      
                                         // LobbyScreen will automatically redirect based on Firestore state
                                       }
-
                                     },
                                   ),
                                 ),
@@ -297,8 +544,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                               if (showSCChoose)
                                 buildCardOverlay('Choose 1 spell to cast', g.pendingCards, false),
 
+                              if (showVoting)
+                                buildVoteOverlay(),
+
                               // Spectator hint
-                              if (!showHMDiscard && !showSCChoose)
+                              if (!showHMDiscard && !showSCChoose && !showVoting)
                                 Align(
                                   alignment: Alignment.bottomCenter,
                                   child: Padding(
@@ -331,6 +581,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     switch (g.phase) {
       case 'start':
         return 'Headmaster: pick a Spellcaster by tapping a hat.';
+      case 'voting':
+        return 'Voting in progress…';
       case 'hm_discard':
         return 'Headmaster is discarding 1 card...';
       case 'sc_choose':
@@ -343,7 +595,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 }
 
-//Simple helper to add a start delay and fade/scale animation to any child.
+// Simple helper to add a start delay and fade/scale animation to any child.
 class _StaggerFadeScale extends StatefulWidget {
   final Widget child;
   final int delayMs;

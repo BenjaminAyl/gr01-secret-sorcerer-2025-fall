@@ -19,13 +19,17 @@ class WizardGameView extends FlameGame with TapCallbacks {
   Map<String, String> nicknameCache = {}; // uid to nickname
   int headmasterIndex = 0;
   int? spellcasterIndex;
+  int? nomineeIndex;  // nominee being voted on
   int charms = 0;
   int curses = 0;
   int countdown = 0;
 
-  //live phase and pending cards for UI
+  // live phase and pending cards for UI
   String phase = 'start';
-  List<String> pendingCards = []; 
+  List<String> pendingCards = [];
+
+  // NEW: votes map <uid, bool>
+  Map<String, bool> votes = {};
 
   SpriteComponent? baseBoard;
   SpriteComponent? charmsRing;
@@ -43,6 +47,12 @@ class WizardGameView extends FlameGame with TapCallbacks {
       spellcasterIndex != null &&
       players[spellcasterIndex!].username == myUid;
 
+  // Voting helpers (read-only)
+  bool get iVoted => votes.containsKey(myUid);
+  int get eligibleVoters => (players.isEmpty) ? 0 : (players.length - 1); // exclude HM
+  int get votedCount => votes.length;
+  bool get allVotesIn => votedCount >= (eligibleVoters.clamp(0, 99));
+
   @override
   Future<void> onLoad() async {
     await _loadBoard();
@@ -55,6 +65,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
     super.onGameResize(canvasSize);
     camera.viewfinder.visibleGameSize = canvasSize;
     camera.viewfinder.position = canvasSize / 2;
+    _layoutHats();
   }
 
   Future<void> _loadBoard() async {
@@ -108,11 +119,29 @@ class WizardGameView extends FlameGame with TapCallbacks {
       spellcasterIndex = idx >= 0 ? idx : null;
     }
 
+    // nominee during voting
+    final nomineeName = data['spellcasterNominee'];
+    if (nomineeName == null) {
+      nomineeIndex = null;
+    } else {
+      final j = players.indexWhere((p) => p.username == nomineeName);
+      nomineeIndex = j >= 0 ? j : null;
+    }
+
+    // votes map
+    final rawVotes = (data['votes'] as Map?) ?? {};
+    votes = rawVotes.map((k, v) {
+      final s = v is bool ? v : v.toString().toLowerCase();
+      final isYes = (s is bool) ? s : (s == 'yes');
+      return MapEntry(k.toString(), isYes);
+    });
+
+
     charms = (data['charms'] ?? 0) as int;
     curses = (data['curses'] ?? 0) as int;
     phase = (data['phase'] ?? 'start').toString();
-    print("🔥 Phase: $phase | pendingCards: $pendingCards | owner: ${data['pendingOwner']}");
-    pendingCards = List<String>.from((data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
+    pendingCards = List<String>.from(
+        (data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
 
     await _resolveNicknames();
 
@@ -122,6 +151,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
     }
 
     _updateHighlights();
+    _updateNomineePulse(); // pulse for nominee during voting
     _updateRings();
   }
 
@@ -145,6 +175,30 @@ class WizardGameView extends FlameGame with TapCallbacks {
     }
   }
 
+  void _layoutHats() {
+    if (players.isEmpty || baseBoard == null || hats.length != players.length) return;
+
+    final n = players.length;
+    final center = baseBoard!.position;      // board center
+    final boardR = baseBoard!.size.x * 0.5;  // board radius (sprite square)
+
+    // Circle radius slightly OUTSIDE the board
+    final outerFactor = (n <= 4 ? 1.07 : (n <= 6 ? 1.08 : 1.12));
+    final circleR = boardR * outerFactor;
+
+    const start = -pi / 2; // index 0 at top
+    for (int i = 0; i < n; i++) {
+      final angle = start + (2 * pi * i) / n;
+      final dir = Vector2(cos(angle), sin(angle));
+      final hat = hats[i];
+      final outwardNudge = (hat.size.y * 0.33) + 6;
+      final pos = center + dir * (circleR + outwardNudge);
+
+      hat.position = pos;
+    }
+  }
+
+
   void _placeHats() {
     for (final h in hats) {
       h.removeFromParent();
@@ -155,7 +209,9 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
     final n = players.length;
     final baseRadius = min(size.x, size.y) * 0.45;
-    final radius = n <= 4 ? baseRadius * 1.25 : (n <= 6 ? baseRadius * 1.35 : baseRadius * 1.45);
+    final radius = n <= 4
+        ? baseRadius * 1.25
+        : (n <= 6 ? baseRadius * 1.35 : baseRadius * 1.45);
     final center = Vector2(size.x / 2, size.y / 2.2);
 
     for (int i = 0; i < n; i++) {
@@ -173,14 +229,21 @@ class WizardGameView extends FlameGame with TapCallbacks {
         ..scale = Vector2.all(1.2);
       add(hat);
       hats.add(hat);
+      _layoutHats();
+
     }
   }
 
   Future<void> _onHatTapped(int index) async {
     if (!isHeadmasterClient) return;
     if (index == headmasterIndex) return;
-    // Choosing the SC automatically triggers HM's draw on the server.
-    await _firebase.updateSpellcaster(lobbyId, players[index].username);
+    // Nominate instead of instantly selecting spellcaster
+    await _firebase.nominateSpellcaster(lobbyId, players[index].username);
+  }
+
+  // Let overlay call this for Yes/No cards
+  Future<void> castVote(bool yes) async {
+    await _firebase.castVote(lobbyId, myUid, yes);
   }
 
   void updateCountdown(int seconds) => countdown = seconds;
@@ -197,6 +260,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
   int? _prevHeadmaster;
   int? _prevSpellcaster;
+  int? _prevNominee;
 
   void _updateHighlights() {
     final changedHM = _prevHeadmaster != headmasterIndex;
@@ -210,15 +274,16 @@ class WizardGameView extends FlameGame with TapCallbacks {
       final wasSC = _prevSpellcaster != null && hat.index == _prevSpellcaster;
 
       if (isHM && changedHM) {
-        hat.removeEffect<ColorEffect>();
+        hat.clearColorEffects();
         hat.add(ColorEffect(
           const Color(0xFFFFFFFF),
           EffectController(duration: 0.6),
           opacityFrom: 0.0,
           opacityTo: 0.7,
         ));
-      } else if (isSC && changedSC) {
-        hat.removeEffect<ColorEffect>();
+      } else if (isSC && changedSC && phase != 'voting') {
+        // Solid purple only when officially elected (not during voting pulse)
+        hat.clearColorEffects();
         hat.add(ColorEffect(
           const Color(0xFF8A2BE2),
           EffectController(duration: 0.6),
@@ -226,7 +291,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
           opacityTo: 0.6,
         ));
       } else if ((wasHM && !isHM) || (wasSC && !isSC)) {
-        hat.removeEffect<ColorEffect>();
+        hat.clearColorEffects();
         hat.add(ColorEffect(
           const Color(0xFFFFFFFF),
           EffectController(duration: 0.6),
@@ -238,6 +303,36 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
     _prevHeadmaster = headmasterIndex;
     _prevSpellcaster = spellcasterIndex;
+  }
+
+  void _updateNomineePulse() {
+    // Stop pulsing previous nominee if changed or voting ended
+    if (_prevNominee != null &&
+        (_prevNominee != nomineeIndex || phase != 'voting')) {
+      for (final h in hats) {
+        if (h.index == _prevNominee) {
+          h.stopPulse();
+          break;
+        }
+      }
+    }
+
+    // Start pulsing current nominee during voting (slower + smaller scale)
+    if (phase == 'voting' && nomineeIndex != null) {
+      for (final h in hats) {
+        if (h.index == nomineeIndex) {
+          h.startPulse(
+            color: const Color(0xFF8A2BE2),
+            minOpacity: 0.20,
+            maxOpacity: 0.60,
+            periodSec: 1.6, // slower pulse
+          );
+          break;
+        }
+      }
+    }
+
+    _prevNominee = nomineeIndex;
   }
 
   int _prevCharmLevel = 0;
@@ -306,20 +401,25 @@ class WizardGameView extends FlameGame with TapCallbacks {
       priority: 10,
     );
     add(ring);
-    Future.delayed(const Duration(milliseconds: 500), () => ring.removeFromParent());
+    Future.delayed(const Duration(milliseconds: 500),
+        () => ring.removeFromParent());
   }
 }
 
-// --- PLAYER HAT CLASS (unchanged) ---
+//PLAYER HAT CLASS
 class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   final int index;
   final String nickname;
   final void Function(int) onTap;
   late TextComponent label;
 
-  PlayerHatComponent(this.index, this.nickname, this.onTap)
-      : super(size: Vector2.all(60), anchor: Anchor.center);
+  Effect? _pulseColor;
 
+
+  PlayerHatComponent(this.index, this.nickname, this.onTap)
+      : super(size: Vector2.all(45), anchor: Anchor.center);
+  
+  static const double _labelGap = 2;
   @override
   Future<void> onLoad() async {
     sprite = await Sprite.load('wizard_hat.png');
@@ -336,6 +436,7 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
       priority: 5,
     );
     add(label);
+    _relayoutLabel(); 
   }
 
   void setColorTint(Color color) {
@@ -351,9 +452,53 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
     });
   }
 
+  void clearColorEffects() {
+    children.whereType<ColorEffect>().toList().forEach((e) => e.removeFromParent());
+  }
+   @override
+  set size(Vector2 v) {
+    super.size = v;
+    if (isMounted) _relayoutLabel();
+  }
+
+  void startPulse({
+    required Color color,
+    double minOpacity = 0.2,
+    double maxOpacity = 0.6,
+    double periodSec = 1.6,
+  }) {
+    stopPulse();
+    clearColorEffects();
+
+    // Color-only pulsing via a repeating ColorEffect
+    _pulseColor = ColorEffect(
+      color,
+      EffectController(
+        duration: periodSec / 2,
+        reverseDuration: periodSec / 2,
+        alternate: true,
+        infinite: true,
+      ),
+      opacityFrom: minOpacity,
+      opacityTo: maxOpacity,
+    );
+    add(_pulseColor!);
+  }
+
+  void stopPulse() {
+    _pulseColor?.removeFromParent();
+    _pulseColor = null;
+    clearColorEffects();
+  }
+
+   void _relayoutLabel() {
+    // place the label just BELOW the hat, centered
+    label.position = Vector2(size.x / 2, size.y + _labelGap);
+  }
+
   @override
   void onMount() {
     super.onMount();
-    label.position = Vector2(size.x / 2, size.y + 12);
+    _relayoutLabel();
   }
 }

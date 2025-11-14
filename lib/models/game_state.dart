@@ -1,7 +1,7 @@
 import 'package:secret_sorcerer/models/game_player.dart';
 
 class GameState {
-  // --- ALL PHASES NAMES FOR REFERENCE ---
+  //ALL PHASES NAMES FOR REFERENCE
   // waiting  : pre-game
   // start    : just started / selecting spellcaster
   // hm_discard: HM drew 3; HM must discard 1
@@ -12,6 +12,7 @@ class GameState {
   late int charms = 0; 
   late int curses = 0; 
 
+  
   late String headmaster = '';
   late String? spellcaster = '';
 
@@ -26,6 +27,10 @@ class GameState {
   late int headmasterIdx = 0;
   String? lastHeadmaster = '';
   String? lastSpellcaster = '';
+  String? spellcasterNominee;      
+
+  late Map<String, String> votes = {};
+
 
   GameState(List<GamePlayer> _players) {
     phase = 'start';
@@ -38,6 +43,7 @@ class GameState {
     pendingOwner = null;
     headmasterIdx = 0;
     headmaster = players[headmasterIdx].username;
+    votes = {};
   }
 
   Map<String, dynamic> toMap() {
@@ -47,6 +53,7 @@ class GameState {
       'curses': curses,
       'headmaster': headmaster,
       'spellcaster': spellcaster,
+      'spellcasterNominee': spellcasterNominee,
       'players': players.map((p) => p.toMap()).toList(),
       'deck': deck,
       'discard': discard,
@@ -55,6 +62,7 @@ class GameState {
       'headmasterIdx': headmasterIdx,
       'lastHeadmaster': lastHeadmaster,
       'lastSpellcaster': lastSpellcaster,
+      'votes': votes,
     };
   }
 }
