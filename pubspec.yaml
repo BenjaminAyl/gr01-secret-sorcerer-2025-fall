@@ -36,3 +36,4 @@ flutter:
     - assets/images/game-assets/board/curseCard.png
     - assets/audio/TavernMusic.wav
     - assets/audio/TavernLobbyMusic.wav
+    - assets/audio/role_reveal.mp3

@@ -31,11 +31,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
   void initState() {
     super.initState();
     _initLobby();
-
-    //Start lobby music on entry
-    Future.microtask(() async {
-    await AudioHelper.fadeTo('TavernLobbyMusic.wav', delayMs: 1500);
-  });
+    Future.microtask(() {
+      AudioHelper.crossfade('TavernLobbyMusic.wav');
+    });
 
   }
 
@@ -66,18 +64,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   void dispose() {
-    //Stop music when leaving
-    AudioHelper.stop();
-
-    // existing cleanup
-    if (mounted) {
-      final route = GoRouterState.of(context).uri.toString();
-      if (!route.contains('/game')) {
-        _cleanupOnExit();
-      }
-    }
     super.dispose();
   }
+
 
   Future<void> _leave(Map<String, dynamic> data) async {
     final isHost = data['creatorId'] == playerId;
@@ -97,7 +86,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   Future<void> _start(List<String> ids) async {
     _isStartingGame = true;
     await _lobbyController.startGame(ids);
-    if (mounted) context.go('/game/${widget.code}');
+    if (mounted) context.go('/reveal/${widget.code}');
   }
 
 
@@ -139,7 +128,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
             _firebase.joinLobby(widget.code, playerId);
           }
 
-          // Close lobby → send everyone home
+          // Close lobby -> send everyone home
           if (status == 'closing') {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) context.go('/home');
@@ -149,9 +138,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
           // Move to game screen
           if (status == 'playing') {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) context.go('/game/${widget.code}');
+              if (mounted) context.go('/reveal/${widget.code}');
             });
           }
+
 
           // UI data
           final hostName = nicknames[creatorId] ?? 'Host';

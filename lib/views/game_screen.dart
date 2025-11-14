@@ -29,23 +29,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    
     _uid = FirebaseAuth.instance.currentUser?.uid;
     final myUid = _uid ?? "unknown";
     _game = WizardGameView(lobbyId: widget.code, myUid: myUid);
 
     // Switch from lobby music to game music
-    AudioHelper.stop();
     
-    Future.microtask(() async {
-      await AudioHelper.fadeTo('TavernMusic.wav', delayMs: 900);
-    });
-
-  }
-
-  void _goBackToLobby() {
-    if (_navigatedOut || !mounted) return;
-    _navigatedOut = true;
-    context.go('/lobby/${widget.code}');
+    AudioHelper.crossfade('TavernMusic.wav');
   }
 
   @override
@@ -74,24 +65,33 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         final lobby = lobbySnap.data!.data()!;
         _creatorId ??= lobby['creatorId'] as String?;
         final status = lobby['status'];
-        if (status == 'waiting') {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
-        }
-
+      
         return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: stateRef.snapshots(),
           builder: (context, stateSnap) {
             if (!stateSnap.hasData) {
               return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()));
+                body: Center(child: CircularProgressIndicator()));
             }
+
+            // If state doc was deleted → return to lobby
             if (!stateSnap.data!.exists) {
-              WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && !_navigatedOut) {
+                  _navigatedOut = true;
+                  context.go('/lobby/${widget.code}');
+                }
+              });
               return const SizedBox.shrink();
             }
 
-            final data = stateSnap.data!.data()!;
-            final phase = data['phase'] ?? 'start';
+            final rawState = stateSnap.data!.data();
+            if (rawState == null) {
+              return const SizedBox.shrink();
+            }
+
+            // Safety: sometimes phase might not be set yet
+            final phase = rawState['phase'] ?? 'start';
             _game.phase = phase;
 
             return Scaffold(
@@ -267,9 +267,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                             .collection('states')
                                             .doc(widget.code)
                                             .delete();
+
                                         await _firebase.resetLobby(widget.code);
-                                        if (mounted) context.go('/lobby/${widget.code}');
+
+                                      
+                                        // LobbyScreen will automatically redirect based on Firestore state
                                       }
+
                                     },
                                   ),
                                 ),
@@ -384,7 +388,6 @@ class _StaggerFadeScaleState extends State<_StaggerFadeScale>
 
   @override
   void dispose() {
-    AudioHelper.stop();
     _ctrl.dispose();
     super.dispose();
   }

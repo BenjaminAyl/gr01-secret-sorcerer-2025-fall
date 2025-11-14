@@ -91,9 +91,8 @@ class FirebaseController {
     final stateRef = _firestore.collection('states').doc(lobbyId);
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
 
-    final players = playerIds
-        .map((uid) => GamePlayer(username: uid, role: 'unknown'))
-        .toList();
+    final players = _assignRoles(playerIds);
+
 
     final state = GameState(players);
     await stateRef.set(state.toMap());
@@ -318,4 +317,69 @@ class FirebaseController {
     //rotate HM (you can also plug executive powers here later Ben)
     await _rotateHeadmaster(lobbyId);
   }
+
+  //role assignment below
+  List<GamePlayer> _assignRoles(List<String> ids) {
+  final n = ids.length;
+  final rng = Random();
+
+  // Shuffle for randomness
+  final shuffled = List<String>.from(ids)..shuffle();
+
+  late int numWarlocks;   // includes ArchWarlock inside
+  late bool archSeesWarlocks;  
+
+  // Player count rules — themed version of Secret Hitler rules
+  if (n == 5) {
+    numWarlocks = 2;       // 1 ArchWarlock + 1 Warlock
+    archSeesWarlocks = false;
+  } else if (n == 6) {
+    numWarlocks = 2;       // 1 ArchWarlock + 1 Warlock
+    archSeesWarlocks = true;
+  } else if (n == 7) {
+    numWarlocks = 3;       // 1 ArchWarlock + 2 Warlocks
+    archSeesWarlocks = false;
+  } else if (n == 8) {
+    numWarlocks = 3;       // 1 ArchWarlock + 2 Warlocks
+    archSeesWarlocks = true;
+  } else if (n == 9){
+    numWarlocks = 4;       // 1 ArchWarlock + 3 Warlocks
+    archSeesWarlocks = false;
+  } else if (n == 10){
+    numWarlocks = 4;       // 1 ArchWarlock + 3 Warlocks
+    archSeesWarlocks = true;
+  } else {
+    numWarlocks = 1;       // failsafe (just ArchWarlock)
+    archSeesWarlocks = false;
+  }
+  final arch = shuffled.first;
+  final warlocks = shuffled.sublist(1, numWarlocks);
+
+  final players = <GamePlayer>[];
+
+  for (final uid in shuffled) {
+    if (uid == arch) {
+      players.add(GamePlayer(username: uid, role: "archwarlock"));
+    } else if (warlocks.contains(uid)) {
+      players.add(GamePlayer(username: uid, role: "warlock"));
+    } else {
+      players.add(GamePlayer(username: uid, role: "wizard")); // good team
+    }
+  }
+
+  for (final p in players) {
+    if (p.role == "warlock") {
+      // Warlocks see ArchWarlock + other Warlocks
+      p.vote = ([arch, ...warlocks.where((w) => w != p.username)]).join(",");
+    }
+    if (p.role == "archwarlock" && archSeesWarlocks) {
+      // ArchWarlock sees warlocks ONLY if rules allow
+      p.vote = warlocks.join(",");
+    }
+  }
+
+  return players;
+}
+
+
 }

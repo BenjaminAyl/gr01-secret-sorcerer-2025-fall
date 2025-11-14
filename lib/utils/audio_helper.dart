@@ -4,21 +4,23 @@ import 'package:flame_audio/flame_audio.dart';
 class AudioHelper {
   static bool _initialized = false;
   static double _targetVolume = 0.7;
+  static bool _isFading = false;
 
   static Future<void> init() async {
     if (_initialized) return;
     await FlameAudio.bgm.initialize();
 
-    // Preload your tracks so they start instantly later
+    //Preload your tracks so they start instantly later
     await FlameAudio.audioCache.loadAll([
       'TavernLobbyMusic.wav',
       'TavernMusic.wav',
+      'role_reveal.mp3',
     ]);
 
     _initialized = true;
   }
 
-  /// Play a track on loop after a short delay (prevents race conditions during screen change)
+  //Play a track on loop after a short delay (prevents race conditions during screen change)
   static Future<void> playLoop(
     String filename, {
     double volume = 0.7,
@@ -39,43 +41,54 @@ class AudioHelper {
     }
   }
 
-  /// Crossfade to another track with smooth fade out and fade in
-  static Future<void> fadeTo(
-    String filename, {
-    double volume = 0.7,
-    int delayMs = 400,
-    Duration step = const Duration(milliseconds: 90),
-  }) async {
+  //Crossfade to another track with smooth fade out and fade in
+  static Future<void> crossfade(String filename,
+      {double volume = 0.7, Duration duration = const Duration(seconds: 1)}) async {
     await init();
-    await Future.delayed(Duration(milliseconds: delayMs));
 
-    // Fade out current track
-    for (double v = _targetVolume; v > 0.0; v -= 0.1) {
-      await FlameAudio.bgm.audioPlayer.setVolume(v.clamp(0.0, 1.0));
-      await Future.delayed(step);
+    if (_isFading) return; //Prevent overlapping fades
+    _isFading = true;
+
+    final player = FlameAudio.bgm.audioPlayer;
+
+    // Save current
+    final double startVol = _targetVolume;
+    final int steps = 30;
+    final double dt = duration.inMilliseconds / steps;
+
+    //Fade out current
+    for (int i = 0; i < steps; i++) {
+      final t = i / steps;
+      final v = startVol * (1 - t);
+      player.setVolume(v);
+      await Future.delayed(Duration(milliseconds: dt.round()));
     }
 
-    await FlameAudio.bgm.stop();
+    // Switch track without stopping audio engine
     await FlameAudio.bgm.play(filename, volume: 0.0);
 
-    // Fade in new track
-    _targetVolume = volume.clamp(0.0, 1.0);
-    for (double v = 0.0; v < _targetVolume; v += 0.1) {
-      await FlameAudio.bgm.audioPlayer.setVolume(v.clamp(0.0, 1.0));
-      await Future.delayed(step);
+    // Fade in new
+    for (int i = 0; i < steps; i++) {
+      final t = i / steps;
+      final v = volume * t;
+      player.setVolume(v);
+      await Future.delayed(Duration(milliseconds: dt.round()));
     }
 
-    await FlameAudio.bgm.audioPlayer.setVolume(_targetVolume);
+    player.setVolume(volume);
+    _targetVolume = volume;
+
+    _isFading = false;
   }
 
-  /// Manually adjust current volume
+  //Manually adjust current volume
   static Future<void> setVolume(double v) async {
     await init();
     _targetVolume = v.clamp(0.0, 1.0);
     await FlameAudio.bgm.audioPlayer.setVolume(_targetVolume);
   }
 
-  /// Stop all background music
+  //Stop all background music
   static Future<void> stop() async {
     await FlameAudio.bgm.stop();
   }
