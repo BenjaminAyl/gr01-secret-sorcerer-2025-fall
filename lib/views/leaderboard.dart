@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
 import 'package:secret_sorcerer/views/leaderboard/leaderboard_window.dart';
@@ -17,9 +18,8 @@ class LeaderboardView extends StatefulWidget {
 
 class _LeaderboardViewState extends State<LeaderboardView> {
 
-  AppUser? _user;
-  final userAuth = UserAuth();
-  final List<AppUser> _allUsers = [];
+  final FirebaseController _firebaseController = FirebaseController();
+  List<Map<String, dynamic>> _allUsers = [];
 
   @override
   void initState() {
@@ -28,8 +28,8 @@ class _LeaderboardViewState extends State<LeaderboardView> {
   }
 
   Future<void> _loadUsers() async {
-    final currentUser = await userAuth.getCurrentUser();
-    setState(() => _user = currentUser);
+    final users = await _firebaseController.loadAllUsers();
+    setState(() => _allUsers = users);
   }
 
 @override
@@ -58,14 +58,8 @@ class _LeaderboardViewState extends State<LeaderboardView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AppSpacing.gapXXL,
-                const LeaderboardWindow(
-                  leaderboardData: [
-                    {'username': 'Gandalf', 'wins': 15},
-                    {'username': 'Merlin', 'wins': 12},
-                    {'username': 'Morgana', 'wins': 10},
-                    {'username': 'Saruman', 'wins': 8},
-                    {'username': 'Radagast', 'wins': 5},
-                  ],
+                LeaderboardWindow(
+                  leaderboardData: _allUsers
                 ),
                 AppSpacing.gapXXL,
               ],

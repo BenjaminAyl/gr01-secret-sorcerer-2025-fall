@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/models/user_model.dart';
 
 class LeaderboardWindow extends StatelessWidget {
   final List<Map<String, dynamic>> leaderboardData;
@@ -40,7 +41,7 @@ class LeaderboardWindow extends StatelessWidget {
                   style: TextStyles.body,
                 ),
                 Text(
-                  'W/L',
+                  'Wins',
                   style: TextStyles.body,
                 ),
                 Text(
@@ -62,30 +63,26 @@ class LeaderboardWindow extends StatelessWidget {
                   return Row(
                     children: [
                       Expanded(
-                        flex: 3,
+                        flex: 4,
                           child: Row(
                             children: [
                               CircleAvatar(
                                 radius: 16,
                                 backgroundColor: AppColors.customAccent,
-                                child: const Icon(
-                                  Icons.emoji_events,
-                                  color: Colors.white,
-                                  size: 20,
+                                child: Image.asset("assets/images/wizard_hat.png")
                                 ),
-                              ),
-                              AppSpacing.gapL,
+                              AppSpacing.gapWM,
                               Text(
-                                entry['username'],
+                                entry['Username'],
                                 style: TextStyles.subheading,
                               )
                             ]
                           ),
                       ),
                       Expanded(
-                        flex: 2,
+                        flex: 1,
                         child: Text(
-                          entry['wins'].toString(),
+                          entry['wins'] != null ? entry['wins'].toString() : '0',
                           style: TextStyles.subheading,
                           textAlign: TextAlign.center,
                         ),
@@ -93,7 +90,7 @@ class LeaderboardWindow extends StatelessWidget {
                       Expanded(
                         flex: 2,
                         child: Text(
-                          "100%",
+                          entry['losses'] != null && entry['losses'] > 0 ? (entry['wins']/(entry['wins'] + entry['losses'])*100).toStringAsFixed(1) + '%' : 'N/A',
                           style: TextStyles.subheading,
                           textAlign: TextAlign.center,
                         ),
