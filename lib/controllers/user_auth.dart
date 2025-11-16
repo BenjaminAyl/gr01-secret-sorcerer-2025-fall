@@ -75,6 +75,8 @@ class UserAuth {
       "Username": usernameLower,
       "Email": credential.user!.email,
       "Nickname": nickname,
+      "wins": 0,
+      "losses": 0,
     });
 
     return uid;
