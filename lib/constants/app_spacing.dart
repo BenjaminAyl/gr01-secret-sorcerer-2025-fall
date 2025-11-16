@@ -42,6 +42,7 @@ class AppSpacing {
   static const double cardWidthNarrow = 250;
   static const double cardWidthMedium = 320;
   static const double cardWidthWide = 400;
+  static const double cardWidthLarge = 580;
 
   static const double iconSizeSmall = 20;
   static const double iconSizeMedium = 32;
