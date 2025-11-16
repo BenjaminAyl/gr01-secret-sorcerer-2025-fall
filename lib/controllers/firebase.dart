@@ -382,10 +382,55 @@ class FirebaseController {
       });
     });
   }
+  String? _executivePowerFor(int players, int curses) {
+    if (players <= 6) {
+      switch (curses) {
+        case 2: return "investigate";
+      }
+    }
 
-  /// SC chooses one to cast
+    if (players <= 8) {
+      switch (curses) {
+        case 3: return "investigate";
+      }
+    }
+
+    return null;
+  }
+  Future<void> investigateSelectTarget(String lobbyId, String targetUid) async {
+  final ref = _firestore.collection('states').doc(lobbyId);
+
+  await ref.update({
+    'executiveTarget': targetUid,
+    'phase': 'executive_investigate_result',
+  });
+  }
+
+  Future<void> endExecutive(String lobbyId) async {
+  final ref = _firestore.collection('states').doc(lobbyId);
+
+  await ref.update({
+    'executivePower': null,
+    'executiveActive': false,
+    'executiveTarget': null,
+    'pendingExecutiveCards': [],
+    'phase': 'resolving',
+  });
+
+  // Once done, go to the next Headmaster
+  await _rotateHeadmaster(lobbyId);
+}
+
+
+
+/// SC chooses one to cast
   Future<void> spellcasterChoose(String lobbyId, int enactIndex) async {
     final ref = _firestore.collection('states').doc(lobbyId);
+
+    bool execTriggered = false;  // <- track if we hit an executive power
+
+    int finalCurses = 0; // values after transaction
+    int finalPlayersCount = 0;
 
     await _firestore.runTransaction((tx) async {
       final snap = await tx.get(ref);
@@ -397,37 +442,61 @@ class FirebaseController {
 
       if (phase != 'sc_choose' || owner != 'spellcaster') return;
 
-      List<String> pending = List<String>.from((data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
-      List<String> discard = List<String>.from((data['discard'] as List?)?.map((e) => e.toString()) ?? []);
+      List<String> pending = List<String>.from(
+          (data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
+
+      List<String> discard = List<String>.from(
+          (data['discard'] as List?)?.map((e) => e.toString()) ?? []);
+
       int charms = (data['charms'] ?? 0) as int;
       int curses = (data['curses'] ?? 0) as int;
+      finalPlayersCount = (data['players'] as List).length;
 
       if (pending.length != 2 || enactIndex < 0 || enactIndex > 1) return;
 
-      final enacted = pending.removeAt(enactIndex); // 1 card left to discard
+      final enacted = pending.removeAt(enactIndex); 
       final thrown = pending.first;
       discard.add(thrown);
 
-      // Apply 
+      // ---- APPLY POLICY ----
       if (enacted == 'charm') {
         charms += 1;
       } else {
         curses += 1;
+
+        // EXECUTIVE POWER CHECK
+        final power = _executivePowerFor(finalPlayersCount, curses);
+
+        if (power != null) {
+          execTriggered = true;
+          tx.update(ref, {
+            'executivePower': power,
+            'executiveActive': true,
+            'phase': 'executive_$power',
+          });
+        }
       }
 
+      finalCurses = curses;
+
+      // baseline update
       tx.update(ref, {
         'charms': charms,
         'curses': curses,
         'discard': discard,
         'pendingCards': [],
         'pendingOwner': null,
-        'phase': 'resolving',
+        if (!execTriggered) 'phase': 'resolving',
       });
     });
 
-    //rotate HM (you can also plug executive powers here later Ben)
-    await _rotateHeadmaster(lobbyId);
+    // OUTSIDE TRANSACTION:
+    // Only rotate HM if NO executive power was invoked
+    if (!execTriggered) {
+      await _rotateHeadmaster(lobbyId);
+    }
   }
+
 
   //role assignment below
   List<GamePlayer> _assignRoles(List<String> ids) {

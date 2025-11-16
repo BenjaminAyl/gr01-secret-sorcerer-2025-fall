@@ -23,6 +23,11 @@ class WizardGameView extends FlameGame with TapCallbacks {
   int charms = 0;
   int curses = 0;
   int countdown = 0;
+  String? executivePower;
+  bool executiveActive = false;
+  String? executiveTarget;
+  List<String> pendingExecutiveCards = [];
+
 
   // live phase and pending cards for UI
   String phase = 'start';
@@ -76,7 +81,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
     ));
 
     final boardSprite = await loadSprite('game-assets/board/baseboard.png');
-    final boardSize = min(size.x, size.y) * 0.7;
+    final boardSize = min(size.x, size.y) * 0.6;
     baseBoard = SpriteComponent(
       sprite: boardSprite,
       size: Vector2.all(boardSize),
@@ -142,6 +147,12 @@ class WizardGameView extends FlameGame with TapCallbacks {
     phase = (data['phase'] ?? 'start').toString();
     pendingCards = List<String>.from(
         (data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
+    executivePower = data['executivePower'];
+    executiveActive = data['executiveActive'] == true;
+    executiveTarget = data['executiveTarget'];
+    pendingExecutiveCards =
+        List<String>.from(data['pendingExecutiveCards'] ?? []);
+
 
     await _resolveNicknames();
 
@@ -183,7 +194,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
     final boardR = baseBoard!.size.x * 0.5;  // board radius (sprite square)
 
     // Circle radius slightly OUTSIDE the board
-    final outerFactor = (n <= 4 ? 1.07 : (n <= 6 ? 1.08 : 1.12));
+    final outerFactor = (n <= 4 ? 1.18 : (n <= 6 ? 1.20 : 1.25));
     final circleR = boardR * outerFactor;
 
     const start = -pi / 2; // index 0 at top
@@ -234,12 +245,26 @@ class WizardGameView extends FlameGame with TapCallbacks {
     }
   }
 
-  Future<void> _onHatTapped(int index) async {
-    if (!isHeadmasterClient) return;
-    if (index == headmasterIndex) return;
-    // Nominate instead of instantly selecting spellcaster
-    await _firebase.nominateSpellcaster(lobbyId, players[index].username);
+Future<void> _onHatTapped(int index) async {
+  // Only the Headmaster can investigate
+  if (!isHeadmasterClient) return;
+
+  // EXECUTIVE INVESTIGATE MODE
+  if (phase == 'executive_investigate') {
+    final targetUid = players[index].username;
+
+    // Cannot investigate yourself
+    if (targetUid == players[headmasterIndex].username) return;
+
+    await _firebase.investigateSelectTarget(lobbyId, targetUid);
+    return;
   }
+
+  // NORMAL nomination
+  if (index == headmasterIndex) return;
+  await _firebase.nominateSpellcaster(lobbyId, players[index].username);
+}
+
 
   // Let overlay call this for Yes/No cards
   Future<void> castVote(bool yes) async {
@@ -339,7 +364,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
   int _prevCurseLevel = 0;
 
   Future<void> _updateRings() async {
-    final ringSize = min(size.x, size.y) * 0.7;
+    final ringSize = min(size.x, size.y) * 0.6;
     final center = Vector2(size.x / 2, size.y / 2.2);
 
     if (charms > 0) {

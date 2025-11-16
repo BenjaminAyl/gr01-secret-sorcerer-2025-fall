@@ -28,6 +28,11 @@ class GameState {
   String? lastHeadmaster = '';
   String? lastSpellcaster = '';
   String? spellcasterNominee;      
+  late String? executivePower = null;
+  late bool executiveActive = false; 
+  late String? executiveTarget = null; 
+  late List<String> pendingExecutiveCards = []; 
+
 
   late Map<String, String> votes = {};
 
@@ -63,6 +68,11 @@ class GameState {
       'lastHeadmaster': lastHeadmaster,
       'lastSpellcaster': lastSpellcaster,
       'votes': votes,
+      'executivePower': executivePower,
+      'executiveActive': executiveActive,
+      'executiveTarget': executiveTarget,
+      'pendingExecutiveCards': pendingExecutiveCards,
+
     };
   }
 }
