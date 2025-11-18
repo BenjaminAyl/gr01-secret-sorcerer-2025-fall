@@ -5,6 +5,7 @@ import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
+import 'package:secret_sorcerer/widgets/dialogs/rules_dialog.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -67,7 +68,11 @@ class HomeScreen extends StatelessWidget {
                     Column(
                       children: [
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () => showDialog(
+                            context: context,
+                            barrierDismissible: true,
+                            builder: (_) => const RulesDialog(),
+                          ),
                           child: Image.asset(
                             'assets/images/tome.png',
                             width: 70,
@@ -112,7 +117,7 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              AppSpacing.gapXL
+              AppSpacing.gapXL,
             ],
           ),
         ),
