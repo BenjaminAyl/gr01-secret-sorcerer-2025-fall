@@ -79,6 +79,20 @@ class HomeScreen extends StatelessWidget {
                       ],
                     ),
                     AppSpacing.gapWL,
+                    Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () => context.go('/leaderboard'),
+                          child: Image.asset(
+                            'assets/images/trophy.png',
+                            width: 70,
+                            height: 70,
+                          ),
+                        ),
+                        AppSpacing.gapXS,
+                        const Text('Leaderboard', style: TextStyles.body),
+                      ],
+                    ),
                     AppSpacing.gapWL,
                     Column(
                       children: [
