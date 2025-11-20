@@ -2,53 +2,68 @@ import 'package:secret_sorcerer/models/game_player.dart';
 
 class GameState {
   //ALL PHASES NAMES FOR REFERENCE
-  // waiting  : pre-game
-  // start    : just started / selecting spellcaster
-  // hm_discard: HM drew 3; HM must discard 1
-  // sc_choose: SC received 2; SC must pick 1 to enact
-  // resolving: applying effects, rotating HM, etc.
+  // waiting       : pre-game
+  // start         : selecting spellcaster
+  // hm_discard    : HM drew 3; must discard 1
+  // sc_choose     : SC got 2; must enact 1
+  // resolving     : apply effects and rotate HM
+  // executive_*   : all executive powers
+
   late String phase = 'waiting';
 
   late int charms = 0; 
   late int curses = 0; 
 
-  
   late String headmaster = '';
   late String? spellcaster = '';
 
   late List<GamePlayer> players = [];
 
-  late List<String> discard = [];     // discarded cards
-  late List<String> pendingCards = []; // current hand
-  late String? pendingOwner = null;    // 'headmaster' or 'spellcaster'
+  late List<String> discard = [];
+  late List<String> pendingCards = [];
+  late String? pendingOwner = null;
 
   late List<String> deck = [];
 
   late int headmasterIdx = 0;
+
   String? lastHeadmaster = '';
   String? lastSpellcaster = '';
-  String? spellcasterNominee;      
+  String? spellcasterNominee;
   late String? executivePower = null;
-  late bool executiveActive = false; 
-  late String? executiveTarget = null; 
-  late List<String> pendingExecutiveCards = []; 
-
-
-  late Map<String, String> votes = {};
-
+  late bool executiveActive = false;
+  late String? executiveTarget = null;
+  late List<String> pendingExecutiveCards = [];
+  late Map<String, bool> dead = {};
+  late String? overrideHM = null;
+  late Map<String, bool> votes = {};
 
   GameState(List<GamePlayer> _players) {
     phase = 'start';
     charms = 0;
     curses = 0;
+
     players = _players;
+
+    // 10 curse + 7 charm deck (randomized)
     deck = (List.filled(10, 'curse') + List.filled(7, 'charm'))..shuffle();
+
     discard = [];
     pendingCards = [];
     pendingOwner = null;
+
     headmasterIdx = 0;
     headmaster = players[headmasterIdx].username;
+
     votes = {};
+
+    //initialize dead map, ALL PLAYERS ALIVE
+    dead = {
+      for (var p in players) p.username: false,
+    };
+
+    // No override HM initially
+    overrideHM = null;
   }
 
   Map<String, dynamic> toMap() {
@@ -68,11 +83,16 @@ class GameState {
       'lastHeadmaster': lastHeadmaster,
       'lastSpellcaster': lastSpellcaster,
       'votes': votes,
+
+      // Executive powers
       'executivePower': executivePower,
       'executiveActive': executiveActive,
       'executiveTarget': executiveTarget,
       'pendingExecutiveCards': pendingExecutiveCards,
 
+      // Dead players
+      'dead': dead,
+      'overrideHM': overrideHM,
     };
   }
 }

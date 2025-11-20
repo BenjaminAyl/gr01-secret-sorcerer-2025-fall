@@ -16,24 +16,26 @@ class WizardGameView extends FlameGame with TapCallbacks {
   final FirebaseController _firebase = FirebaseController();
 
   List<GamePlayer> players = [];
+  Set<String> _prevDeadUids = {};
   Map<String, String> nicknameCache = {}; // uid to nickname
   int headmasterIndex = 0;
   int? spellcasterIndex;
-  int? nomineeIndex;  // nominee being voted on
+  int? nomineeIndex; // nominee being voted on
   int charms = 0;
   int curses = 0;
   int countdown = 0;
+
   String? executivePower;
   bool executiveActive = false;
   String? executiveTarget;
   List<String> pendingExecutiveCards = [];
-
+  Map<String, bool> dead = {};
 
   // live phase and pending cards for UI
   String phase = 'start';
   List<String> pendingCards = [];
 
-  // NEW: votes map <uid, bool>
+  // votes map <uid, bool>
   Map<String, bool> votes = {};
 
   SpriteComponent? baseBoard;
@@ -52,11 +54,16 @@ class WizardGameView extends FlameGame with TapCallbacks {
       spellcasterIndex != null &&
       players[spellcasterIndex!].username == myUid;
 
-  // Voting helpers (read-only)
+  // 🔥 NEW: voting counts only ALIVE non-HM wizards
+  int get _alivePlayerCount =>
+      players.where((p) => !(dead[p.username] ?? false)).length;
+
+  int get eligibleVoters =>
+      _alivePlayerCount > 0 ? (_alivePlayerCount - 1) : 0; // exclude HM
+
   bool get iVoted => votes.containsKey(myUid);
-  int get eligibleVoters => (players.isEmpty) ? 0 : (players.length - 1); // exclude HM
   int get votedCount => votes.length;
-  bool get allVotesIn => votedCount >= (eligibleVoters.clamp(0, 99));
+  bool get allVotesIn => votedCount >= eligibleVoters;
 
   @override
   Future<void> onLoad() async {
@@ -74,11 +81,13 @@ class WizardGameView extends FlameGame with TapCallbacks {
   }
 
   Future<void> _loadBoard() async {
-    add(RectangleComponent(
-      size: size,
-      paint: Paint()..color = AppColors.primaryBrand,
-      priority: -10,
-    ));
+    add(
+      RectangleComponent(
+        size: size,
+        paint: Paint()..color = AppColors.primaryBrand,
+        priority: -10,
+      ),
+    );
 
     final boardSprite = await loadSprite('game-assets/board/baseboard.png');
     final boardSize = min(size.x, size.y) * 0.6;
@@ -107,15 +116,22 @@ class WizardGameView extends FlameGame with TapCallbacks {
   Future<void> _syncFromData(Map<String, dynamic> data) async {
     final rawPlayers = (data['players'] as List?) ?? [];
     players = rawPlayers
-        .map((p) => GamePlayer(
-              username: p['username'] ?? '',
-              vote: p['vote'],
-              role: p['role'] ?? 'unknown',
-            ))
+        .map(
+          (p) => GamePlayer(
+            username: p['username'] ?? '',
+            vote: p['vote'],
+            role: p['role'] ?? 'unknown',
+          ),
+        )
         .toList();
+
+    // dead map
+    final rawDead = Map<String, dynamic>.from(data['dead'] ?? {});
+    dead = rawDead.map((key, value) => MapEntry(key.toString(), value == true));
 
     headmasterIndex = (data['headmasterIdx'] ?? 0) as int;
 
+    // spellcaster index
     final spellName = data['spellcaster'];
     if (spellName == null) {
       spellcasterIndex = null;
@@ -124,7 +140,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
       spellcasterIndex = idx >= 0 ? idx : null;
     }
 
-    // nominee during voting
+    // nominee index
     final nomineeName = data['spellcasterNominee'];
     if (nomineeName == null) {
       nomineeIndex = null;
@@ -133,26 +149,25 @@ class WizardGameView extends FlameGame with TapCallbacks {
       nomineeIndex = j >= 0 ? j : null;
     }
 
-    // votes map
+    // votes
     final rawVotes = (data['votes'] as Map?) ?? {};
     votes = rawVotes.map((k, v) {
-      final s = v is bool ? v : v.toString().toLowerCase();
-      final isYes = (s is bool) ? s : (s == 'yes');
-      return MapEntry(k.toString(), isYes);
+      if (v is bool) return MapEntry(k.toString(), v);
+      final s = v.toString().toLowerCase();
+      return MapEntry(k.toString(), s == 'yes');
     });
-
 
     charms = (data['charms'] ?? 0) as int;
     curses = (data['curses'] ?? 0) as int;
     phase = (data['phase'] ?? 'start').toString();
     pendingCards = List<String>.from(
         (data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
+
     executivePower = data['executivePower'];
     executiveActive = data['executiveActive'] == true;
     executiveTarget = data['executiveTarget'];
     pendingExecutiveCards =
         List<String>.from(data['pendingExecutiveCards'] ?? []);
-
 
     await _resolveNicknames();
 
@@ -161,10 +176,40 @@ class WizardGameView extends FlameGame with TapCallbacks {
       _placeHats();
     }
 
+    // Run death animations for newly dead
+    final newlyDead = dead.entries
+        .where((e) => e.value == true && !_prevDeadUids.contains(e.key))
+        .map((e) => e.key)
+        .toSet();
+
+    if (newlyDead.isNotEmpty && hats.length == players.length) {
+      for (int i = 0; i < players.length; i++) {
+        final uid = players[i].username;
+        if (newlyDead.contains(uid)) {
+          final isArch = players[i].role == 'archwarlock';
+          hats[i].runDeathSequence(isArch: isArch);
+        } else if (dead[uid] == true) {
+          hats[i].dead = true;
+          hats[i].paint = Paint()
+            ..colorFilter = const ColorFilter.mode(
+              Colors.black,
+              BlendMode.modulate,
+            );
+        }
+      }
+    }
+
+    _prevDeadUids = dead.entries
+        .where((e) => e.value == true)
+        .map((e) => e.key)
+        .toSet();
+
     _updateHighlights();
-    _updateNomineePulse(); // pulse for nominee during voting
+    _updateNomineePulse();
     _updateRings();
+    _updateDeadHats();
   }
+
 
   Future<void> _resolveNicknames() async {
     final usersRef = FirebaseFirestore.instance.collection('users');
@@ -187,28 +232,27 @@ class WizardGameView extends FlameGame with TapCallbacks {
   }
 
   void _layoutHats() {
-    if (players.isEmpty || baseBoard == null || hats.length != players.length) return;
+    if (players.isEmpty || baseBoard == null || hats.length != players.length) {
+      return;
+    }
 
     final n = players.length;
-    final center = baseBoard!.position;      // board center
-    final boardR = baseBoard!.size.x * 0.5;  // board radius (sprite square)
+    final center = baseBoard!.position;
+    final boardR = baseBoard!.size.x * 0.5;
 
-    // Circle radius slightly OUTSIDE the board
     final outerFactor = (n <= 4 ? 1.18 : (n <= 6 ? 1.20 : 1.25));
     final circleR = boardR * outerFactor;
 
-    const start = -pi / 2; // index 0 at top
+    const start = -pi / 2;
     for (int i = 0; i < n; i++) {
       final angle = start + (2 * pi * i) / n;
       final dir = Vector2(cos(angle), sin(angle));
       final hat = hats[i];
       final outwardNudge = (hat.size.y * 0.33) + 6;
       final pos = center + dir * (circleR + outwardNudge);
-
       hat.position = pos;
     }
   }
-
 
   void _placeHats() {
     for (final h in hats) {
@@ -220,9 +264,8 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
     final n = players.length;
     final baseRadius = min(size.x, size.y) * 0.45;
-    final radius = n <= 4
-        ? baseRadius * 1.25
-        : (n <= 6 ? baseRadius * 1.35 : baseRadius * 1.45);
+    final radius =
+        n <= 4 ? baseRadius * 1.25 : (n <= 6 ? baseRadius * 1.35 : baseRadius * 1.45);
     final center = Vector2(size.x / 2, size.y / 2.2);
 
     for (int i = 0; i < n; i++) {
@@ -240,31 +283,65 @@ class WizardGameView extends FlameGame with TapCallbacks {
         ..scale = Vector2.all(1.2);
       add(hat);
       hats.add(hat);
-      _layoutHats();
+    }
 
+    _layoutHats();
+    _updateDeadHats(); // in case some were already dead
+  }
+
+  //apply dead tint to hats
+  void _updateDeadHats() {
+    if (hats.length != players.length) return;
+    for (final hat in hats) {
+      if (hat.index < 0 || hat.index >= players.length) continue;
+      final uid = players[hat.index].username;
+      final isDead = dead[uid] == true;
+      hat.setDead(isDead);
     }
   }
 
-Future<void> _onHatTapped(int index) async {
-  // Only the Headmaster can investigate
-  if (!isHeadmasterClient) return;
-
-  // EXECUTIVE INVESTIGATE MODE
-  if (phase == 'executive_investigate') {
+  Future<void> _onHatTapped(int index) async {
+    if (index < 0 || index >= players.length) return;
     final targetUid = players[index].username;
 
-    // Cannot investigate yourself
-    if (targetUid == players[headmasterIndex].username) return;
+    // Dead players are untouchable
+    if (dead[targetUid] == true) return;
 
-    await _firebase.investigateSelectTarget(lobbyId, targetUid);
-    return;
+    // Only HM interacts in special phases
+    final isHM = isHeadmasterClient;
+    final hmUid = players[headmasterIndex].username;
+
+    // EXECUTIVE: investigate
+    if (phase == 'executive_investigate') {
+      if (!isHM) return;
+      if (targetUid == hmUid) return; // can't inspect self
+      await _firebase.investigateSelectTarget(lobbyId, targetUid);
+      return;
+    }
+
+    // EXECUTIVE: choose next headmaster
+    if (phase == 'executive_choose_hm') {
+      if (!isHM) return;
+      if (targetUid == hmUid) return; // no choosing yourself
+      await _firebase.chooseNextHeadmaster(lobbyId, targetUid);
+      return;
+    }
+
+    // EXECUTIVE: kill
+    if (phase == 'executive_kill') {
+      if (!isHM) return;
+      if (targetUid == hmUid) return; // can't suicide
+      await _firebase.selectKillTarget(lobbyId, targetUid);
+      return;
+    }
+
+    // NORMAL nomination phase
+    if (phase == 'start') {
+      if (!isHM) return;
+      if (targetUid == hmUid) return;
+      await _firebase.nominateSpellcaster(lobbyId, targetUid);
+    }
   }
-
-  // NORMAL nomination
-  if (index == headmasterIndex) return;
-  await _firebase.nominateSpellcaster(lobbyId, players[index].username);
-}
-
 
   // Let overlay call this for Yes/No cards
   Future<void> castVote(bool yes) async {
@@ -298,31 +375,46 @@ Future<void> _onHatTapped(int index) async {
       final wasHM = hat.index == _prevHeadmaster;
       final wasSC = _prevSpellcaster != null && hat.index == _prevSpellcaster;
 
+      // Don’t highlight dead ghosts
+      final uid = (hat.index >= 0 && hat.index < players.length)
+          ? players[hat.index].username
+          : '';
+      if (dead[uid] == true) {
+        hat.clearColorEffects();
+        continue;
+      }
+
       if (isHM && changedHM) {
         hat.clearColorEffects();
-        hat.add(ColorEffect(
-          const Color(0xFFFFFFFF),
-          EffectController(duration: 0.6),
-          opacityFrom: 0.0,
-          opacityTo: 0.7,
-        ));
+        hat.add(
+          ColorEffect(
+            const Color(0xFFFFFFFF),
+            EffectController(duration: 0.6),
+            opacityFrom: 0.0,
+            opacityTo: 0.7,
+          ),
+        );
       } else if (isSC && changedSC && phase != 'voting') {
         // Solid purple only when officially elected (not during voting pulse)
         hat.clearColorEffects();
-        hat.add(ColorEffect(
-          const Color(0xFF8A2BE2),
-          EffectController(duration: 0.6),
-          opacityFrom: 0.0,
-          opacityTo: 0.6,
-        ));
+        hat.add(
+          ColorEffect(
+            const Color(0xFF8A2BE2),
+            EffectController(duration: 0.6),
+            opacityFrom: 0.0,
+            opacityTo: 0.6,
+          ),
+        );
       } else if ((wasHM && !isHM) || (wasSC && !isSC)) {
         hat.clearColorEffects();
-        hat.add(ColorEffect(
-          const Color(0xFFFFFFFF),
-          EffectController(duration: 0.6),
-          opacityFrom: 0.7,
-          opacityTo: 0.0,
-        ));
+        hat.add(
+          ColorEffect(
+            const Color(0xFFFFFFFF),
+            EffectController(duration: 0.6),
+            opacityFrom: 0.7,
+            opacityTo: 0.0,
+          ),
+        );
       }
     }
 
@@ -331,7 +423,6 @@ Future<void> _onHatTapped(int index) async {
   }
 
   void _updateNomineePulse() {
-    // Stop pulsing previous nominee if changed or voting ended
     if (_prevNominee != null &&
         (_prevNominee != nomineeIndex || phase != 'voting')) {
       for (final h in hats) {
@@ -342,15 +433,20 @@ Future<void> _onHatTapped(int index) async {
       }
     }
 
-    // Start pulsing current nominee during voting (slower + smaller scale)
     if (phase == 'voting' && nomineeIndex != null) {
       for (final h in hats) {
         if (h.index == nomineeIndex) {
+          // Don’t pulse dead
+          final uid = players[h.index].username;
+          if (dead[uid] == true) {
+            h.stopPulse();
+            break;
+          }
           h.startPulse(
             color: const Color(0xFF8A2BE2),
             minOpacity: 0.20,
             maxOpacity: 0.60,
-            periodSec: 1.6, // slower pulse
+            periodSec: 1.6,
           );
           break;
         }
@@ -381,7 +477,8 @@ Future<void> _onHatTapped(int index) async {
           priority: -2,
         )..opacity = 0.0;
 
-        charmsRing!.add(OpacityEffect.to(1.0, EffectController(duration: 0.8)));
+        charmsRing!
+            .add(OpacityEffect.to(1.0, EffectController(duration: 0.8)));
         add(charmsRing!);
         _prevCharmLevel = charms;
       }
@@ -404,7 +501,8 @@ Future<void> _onHatTapped(int index) async {
           priority: -1,
         )..opacity = 0.0;
 
-        cursesRing!.add(OpacityEffect.to(1.0, EffectController(duration: 0.8)));
+        cursesRing!
+            .add(OpacityEffect.to(1.0, EffectController(duration: 0.8)));
         add(cursesRing!);
         _prevCurseLevel = curses;
       }
@@ -426,12 +524,14 @@ Future<void> _onHatTapped(int index) async {
       priority: 10,
     );
     add(ring);
-    Future.delayed(const Duration(milliseconds: 500),
-        () => ring.removeFromParent());
+    Future.delayed(
+      const Duration(milliseconds: 500),
+      () => ring.removeFromParent(),
+    );
   }
 }
 
-//PLAYER HAT CLASS
+// PLAYER HAT CLASS
 class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   final int index;
   final String nickname;
@@ -439,12 +539,13 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   late TextComponent label;
 
   Effect? _pulseColor;
-
+  bool dead = false;
 
   PlayerHatComponent(this.index, this.nickname, this.onTap)
       : super(size: Vector2.all(45), anchor: Anchor.center);
-  
+
   static const double _labelGap = 2;
+
   @override
   Future<void> onLoad() async {
     sprite = await Sprite.load('wizard_hat.png');
@@ -461,15 +562,19 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
       priority: 5,
     );
     add(label);
-    _relayoutLabel(); 
+    _relayoutLabel();
   }
 
   void setColorTint(Color color) {
     paint = Paint()..colorFilter = ColorFilter.mode(color, BlendMode.modulate);
   }
 
+  //Block taps if dead
   @override
-  void onTapDown(TapDownEvent event) => onTap(index);
+  void onTapDown(TapDownEvent event) {
+    if (dead) return;
+    onTap(index);
+  }
 
   void removeEffect<T extends Effect>() {
     children.whereType<T>().toList().forEach((effect) {
@@ -480,7 +585,8 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   void clearColorEffects() {
     children.whereType<ColorEffect>().toList().forEach((e) => e.removeFromParent());
   }
-   @override
+
+  @override
   set size(Vector2 v) {
     super.size = v;
     if (isMounted) _relayoutLabel();
@@ -495,7 +601,6 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
     stopPulse();
     clearColorEffects();
 
-    // Color-only pulsing via a repeating ColorEffect
     _pulseColor = ColorEffect(
       color,
       EffectController(
@@ -516,8 +621,7 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
     clearColorEffects();
   }
 
-   void _relayoutLabel() {
-    // place the label just BELOW the hat, centered
+  void _relayoutLabel() {
     label.position = Vector2(size.x / 2, size.y + _labelGap);
   }
 
@@ -526,4 +630,66 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
     super.onMount();
     _relayoutLabel();
   }
+
+  //mark dead & tint hat black
+  void setDead(bool value) {
+    if (dead == value) return;
+    dead = value;
+
+    if (dead) {
+      stopPulse();
+      clearColorEffects();
+      paint = Paint()
+        ..colorFilter = const ColorFilter.mode(
+          Colors.black,
+          BlendMode.srcATop,
+        );
+    } else {
+      paint = Paint(); // reset to normal sprite
+    }
+  }
+
+    Future<void> runDeathSequence({required bool isArch}) async {
+    dead = true;
+    stopPulse();
+    clearColorEffects();
+
+    // Big flash + shake
+    add(ColorEffect(
+      isArch ? Colors.redAccent : Colors.deepPurple,
+      EffectController(
+        duration: 0.15,
+        reverseDuration: 0.15,
+        alternate: true,
+        repeatCount: 4,
+      ),
+      opacityFrom: 0.0,
+      opacityTo: 0.9,
+    ));
+
+    add(ScaleEffect.to(
+      size * 1.4,
+      EffectController(
+        duration: 0.35,
+        reverseDuration: 0.25,
+      ),
+    ));
+
+    await Future.delayed(const Duration(milliseconds: 700));
+
+    // Lock in: black hat, ghosted name
+    paint = Paint()
+      ..colorFilter = const ColorFilter.mode(
+        Colors.black,
+        BlendMode.modulate,
+      );
+
+    label.textRenderer = TextPaint(
+      style: TextStyles.bodySmall.copyWith(
+        fontSize: 14,
+        color: Colors.grey.shade600,
+      ),
+    );
+  }
+
 }

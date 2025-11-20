@@ -140,97 +140,98 @@ class FirebaseController {
     });
   }
   Future<void> castVote(String lobbyId, String voterUid, bool approve) async {
-  final ref = _firestore.collection('states').doc(lobbyId);
+    final ref = _firestore.collection('states').doc(lobbyId);
 
-  bool becameResultsPhase = false;
-  bool passed = false;
+    bool becameResultsPhase = false;
+    bool passed = false;
 
-  await _firestore.runTransaction((tx) async {
-    final snap = await tx.get(ref);
-    if (!snap.exists) return;
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
 
-    final data = snap.data()!;
-    final phase = data['phase'];
-    if (phase != 'voting') return;
+      final data = snap.data()!;
+      final phase = data['phase'];
+      if (phase != 'voting') return;
 
-    final players = List<Map<String, dynamic>>.from((data['players'] as List?) ?? []);
-    if (players.isEmpty) return;
+      final players =
+          List<Map<String, dynamic>>.from((data['players'] as List?) ?? []);
+      if (players.isEmpty) return;
 
-    final headmaster = (data['headmaster'] ?? '') as String;
-    final nominee = (data['spellcasterNominee'] ?? '') as String;
-    if (nominee.isEmpty) return;
+      final headmaster = (data['headmaster'] ?? '') as String;
+      final nominee = (data['spellcasterNominee'] ?? '') as String;
+      if (nominee.isEmpty) return;
 
-    if (voterUid == headmaster) return; // HM does not vote
+      final dead = Map<String, bool>.from((data['dead'] as Map?) ?? {});
+      if (dead[voterUid] == true) return; // dead can't vote
 
-    final votes = Map<String, String>.from((data['votes'] as Map?) ?? {});
-    if (votes.containsKey(voterUid)) return; // no double voting
+      if (voterUid == headmaster) return; // HM does not vote
 
-    votes[voterUid] = approve ? 'yes' : 'no';
+      final votes = Map<String, String>.from((data['votes'] as Map?) ?? {});
+      if (votes.containsKey(voterUid)) return; // no double voting
 
-    // Eligible voters = everyone except HM
-    final eligible = players.map((p) => (p['username'] ?? '') as String).where((u) => u != headmaster).toList();
-    final totalNeeded = eligible.length;
+      votes[voterUid] = approve ? 'yes' : 'no';
 
-    if (votes.length >= totalNeeded) {
-      final yesCount = votes.values.where((v) => v == 'yes').length;
-      final noCount  = totalNeeded - yesCount;
-      passed = yesCount > noCount;
+      // Eligible voters = everyone except HM and dead players
+      final eligible = players
+          .map((p) => (p['username'] ?? '') as String)
+          .where((u) => u.isNotEmpty && u != headmaster && dead[u] != true)
+          .toList();
+      final totalNeeded = eligible.length;
 
-      // Show results on-screen: keep votes & nominee for a brief window
-      tx.update(ref, {
-        'phase': 'voting_results',
-        'votes': votes,                   // keep so UI can render who voted what
-        'votePassed': passed,             // optional helper flag for UI/logs
-        // keep 'spellcasterNominee' so we can still show the elected name in results
-      });
-      becameResultsPhase = true;
-    } else {
-      // Still voting
-      tx.update(ref, {'votes': votes});
-    }
-  });
+      if (votes.length >= totalNeeded) {
+        final yesCount = votes.values.where((v) => v == 'yes').length;
+        final noCount = totalNeeded - yesCount;
+        passed = yesCount > noCount;
 
-  // If we just switched to results - pause briefly so clients can show the tally.
-  if (becameResultsPhase) {
-    await Future.delayed(const Duration(seconds: 8));
+        tx.update(ref, {
+          'phase': 'voting_results',
+          'votes': votes,
+          'votePassed': passed,
+        });
+        becameResultsPhase = true;
+      } else {
+        tx.update(ref, {'votes': votes});
+      }
+    });
 
-    final after = await _firestore.collection('states').doc(lobbyId).get();
-    final d = after.data();
-    if (d == null) return;
+    if (becameResultsPhase) {
+      await Future.delayed(const Duration(seconds: 8));
 
-    // If something else already advanced the phase, bail.
-    if (d['phase'] != 'voting_results') return;
+      final after = await _firestore.collection('states').doc(lobbyId).get();
+      final d = after.data();
+      if (d == null) return;
 
-    if (passed) {
-      // Commit the spellcaster, clear votes/nominee, then draw for HM
-      final nominee = (d['spellcasterNominee'] ?? '') as String;
-      if (nominee.isNotEmpty) {
+      if (d['phase'] != 'voting_results') return;
+
+      if (passed) {
+        final nominee = (d['spellcasterNominee'] ?? '') as String;
+        if (nominee.isNotEmpty) {
+          await _firestore.collection('states').doc(lobbyId).update({
+            'spellcaster': nominee,
+            'spellcasterNominee': null,
+            'votes': <String, String>{},
+            'votePassed': FieldValue.delete(),
+            'phase': 'start',
+            'pendingCards': [],
+            'pendingOwner': null,
+          });
+          await _drawForHeadmaster(lobbyId);
+        }
+      } else {
         await _firestore.collection('states').doc(lobbyId).update({
-          'spellcaster': nominee,
+          'spellcaster': null,
           'spellcasterNominee': null,
           'votes': <String, String>{},
           'votePassed': FieldValue.delete(),
-          'phase': 'start',           // _drawForHeadmaster will set 'hm_discard'
+          'phase': 'resolving',
           'pendingCards': [],
           'pendingOwner': null,
         });
-        await _drawForHeadmaster(lobbyId);
+        await _rotateHeadmaster(lobbyId);
       }
-    } else {
-      // Failed election: clear votes/nominee, show resolving, then rotate HM
-      await _firestore.collection('states').doc(lobbyId).update({
-        'spellcaster': null,
-        'spellcasterNominee': null,
-        'votes': <String, String>{},
-        'votePassed': FieldValue.delete(),
-        'phase': 'resolving',
-        'pendingCards': [],
-        'pendingOwner': null,
-      });
-      await _rotateHeadmaster(lobbyId);
-     }
-   }
- }
+    }
+  }
+
 
   Future<void> _rotateHeadmaster(String lobbyId) async {
     final stateRef = _firestore.collection('states').doc(lobbyId);
@@ -242,8 +243,20 @@ class FirebaseController {
       final players = (data['players'] as List?) ?? [];
       if (players.isEmpty) return;
 
+      final deadMap = Map<String, bool>.from((data['dead'] ?? {}));
+
       final currentIdx = (data['headmasterIdx'] ?? 0) as int;
-      final nextIdx = (currentIdx + 1) % players.length;
+      int nextIdx = currentIdx;
+
+      //advance until we find a living wizard
+      for (int i = 0; i < players.length; i++) {
+        nextIdx = (nextIdx + 1) % players.length;
+        final candidateUid = players[nextIdx]['username'] ?? '';
+        if (deadMap[candidateUid] != true) {
+          break;
+        }
+      }
+
       final nextUid = players[nextIdx]['username'] ?? '';
 
       tx.update(stateRef, {
@@ -258,6 +271,7 @@ class FirebaseController {
       });
     });
   }
+
 
   Future<void> incrementCharm(String lobbyId) async {
     final stateRef = _firestore.collection('states').doc(lobbyId);
@@ -383,19 +397,37 @@ class FirebaseController {
     });
   }
   String? _executivePowerFor(int players, int curses) {
-    // 5–6 players: peek top 3 at 3 curses
-    if (players >= 1 && players <= 6) {
+    // TEMPORARY: enable executive powers for small test games
+    if (players < 5) {
+      if (curses == 1) return "peek3";
+      if (curses == 2) return "choose_next_hm";
+      if (curses == 3) return "kill";// trigger EARLY for test
+      return null;
+    }
+
+    //real game
+    // 5–6 players
+    if (players <= 6) {
       if (curses == 3) return "peek3";
+      if (curses == 4) return "kill";
+      if (curses == 5) return "kill"; 
     }
 
-    // 7–8 players: investigate at 2 
-    if (players >= 7 && players <= 8) {
+    // 7–8 players
+    if (players <= 8) {
       if (curses == 2) return "investigate";
+      if (curses == 3) return "choose_next_hm";
+      if (curses == 4) return "kill";
+      if (curses == 5) return "kill";
     }
 
-    // 9–10 players: investigate at 1 and 2 
-    if (players >= 9 && players <= 10) {
-      if (curses == 1 || curses == 2) return "investigate";
+    // 9–10 players
+    if (players <= 10) {
+      if (curses == 1) return "investigate";
+      if (curses == 2) return "investigate";
+      if (curses == 3) return "choose_next_hm";
+      if (curses == 4) return "kill";
+      if (curses == 5) return "kill";
     }
 
     return null;
@@ -426,14 +458,112 @@ class FirebaseController {
   await _rotateHeadmaster(lobbyId);
 }
 
+Future<void> chooseNextHeadmaster(String lobbyId, String targetUid) async {
+  final ref = _firestore.collection('states').doc(lobbyId);
+
+  await ref.update({
+    'overrideHM': targetUid,
+    'executiveTarget': targetUid,
+    'phase': 'executive_choose_hm_result',
+  });
+}
+
+Future<void> confirmNextHeadmaster(String lobbyId) async {
+  final ref = _firestore.collection('states').doc(lobbyId);
+
+  await _firestore.runTransaction((tx) async {
+    final snap = await tx.get(ref);
+    if (!snap.exists) return;
+
+    final data = snap.data()!;
+    final players = (data['players'] as List).cast<Map<String, dynamic>>();
+    final targetUid = data['overrideHM'];
+
+    if (targetUid == null) return;
+
+    final newIndex = players.indexWhere((p) => p['username'] == targetUid);
+    if (newIndex < 0) return;
+
+    tx.update(ref, {
+      'headmasterIdx': newIndex,
+      'headmaster': targetUid,
+      'spellcaster': null,
+      'executivePower': null,
+      'executiveActive': false,
+      'executiveTarget': null,
+      'pendingExecutiveCards': [],
+      'phase': 'start',
+    });
+  });
+
+  await _drawForHeadmaster(lobbyId);
+}
+
+  Future<void> selectKillTarget(String lobbyId, String targetUid) async {
+    final ref = _firestore.collection('states').doc(lobbyId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      final players =
+          (data['players'] as List).cast<Map<String, dynamic>>();
+
+      final victim = players.firstWhere(
+        (p) => p['username'] == targetUid,
+        orElse: () => {},
+      );
+
+      if (victim.isEmpty) return;
+
+      final role = (victim['role'] ?? 'wizard') as String;
+
+      final phase = role == 'archwarlock'
+          ? 'executive_kill_result_arch'
+          : 'executive_kill_result';
+
+      tx.update(ref, {
+        'executiveTarget': targetUid,
+        'phase': phase,
+      });
+    });
+  }
+
+  Future<void> finalizeKill(String lobbyId) async {
+    final ref = _firestore.collection('states').doc(lobbyId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      final target = data['executiveTarget'];
+      if (target == null) return;
+
+      final dead = Map<String, bool>.from(data['dead'] ?? {});
+      dead[target] = true;
+
+      tx.update(ref, {
+        'dead': dead,
+        'executivePower': null,
+        'executiveActive': false,
+        'executiveTarget': null,
+        'pendingExecutiveCards': [],
+        'phase': 'resolving',
+      });
+    });
+
+    await _rotateHeadmaster(lobbyId);
+  }
 
 
   Future<void> spellcasterChoose(String lobbyId, int enactIndex) async {
     final ref = _firestore.collection('states').doc(lobbyId);
 
     bool execTriggered = false;
-    String? execPowerToTrigger;  
-    List<String> peekCards = [];    
+    String? execPowerToTrigger;
+    List<String> peekCards = [];
     int finalPlayersCount = 0;
 
     await _firestore.runTransaction((tx) async {
@@ -446,8 +576,10 @@ class FirebaseController {
 
       if (phase != 'sc_choose' || owner != 'spellcaster') return;
 
-      List<String> pending = List<String>.from((data['pendingCards'] ?? []).cast<String>());
-      List<String> discard = List<String>.from((data['discard'] ?? []).cast<String>());
+      List<String> pending =
+          List<String>.from((data['pendingCards'] ?? []).cast<String>());
+      List<String> discard =
+          List<String>.from((data['discard'] ?? []).cast<String>());
       int charms = data['charms'] ?? 0;
       int curses = data['curses'] ?? 0;
       finalPlayersCount = (data['players'] as List).length;
@@ -457,6 +589,7 @@ class FirebaseController {
       // Apply enacted & discarded
       final enacted = pending.removeAt(enactIndex);
       discard.add(pending.first); // the thrown card
+
       if (enacted == 'charm') {
         charms += 1;
       } else {
@@ -464,14 +597,13 @@ class FirebaseController {
 
         // Check which executive power will trigger
         final power = _executivePowerFor(finalPlayersCount, curses);
-
         if (power != null) {
           execTriggered = true;
           execPowerToTrigger = power;
 
-          // Prepare peek3 cards BEFORE writing anything
           if (power == "peek3") {
-            final List<String> deck = List<String>.from(data['deck'] ?? []);
+            final List<String> deck =
+                List<String>.from((data['deck'] ?? []).cast<String>());
             if (deck.length >= 3) {
               peekCards = List<String>.from(deck.sublist(0, 3));
             }
@@ -479,7 +611,7 @@ class FirebaseController {
         }
       }
 
-      //update state baseline
+      // Baseline update (always lay the card!)
       tx.update(ref, {
         'charms': charms,
         'curses': curses,
@@ -489,30 +621,43 @@ class FirebaseController {
         if (!execTriggered) 'phase': 'resolving',
       });
 
-      //power activation
-      if (execTriggered && execPowerToTrigger == "investigate") {
+      // Now trigger the executive power (no early returns)
+      if (!execTriggered) return;
+
+      if (execPowerToTrigger == "investigate") {
         tx.update(ref, {
           'executivePower': 'investigate',
           'executiveActive': true,
           'phase': 'executive_investigate',
         });
-      }
-
-      if (execTriggered && execPowerToTrigger == "peek3") {
+      } else if (execPowerToTrigger == "peek3") {
         tx.update(ref, {
           'executivePower': 'peek3',
           'executiveActive': true,
           'phase': 'executive_peek3',
           'pendingExecutiveCards': peekCards,
         });
+      } else if (execPowerToTrigger == "choose_next_hm") {
+        tx.update(ref, {
+          'executivePower': 'choose_next_hm',
+          'executiveActive': true,
+          'phase': 'executive_choose_hm',
+          'executiveTarget': null,
+        });
+      } else if (execPowerToTrigger == "kill") {
+        tx.update(ref, {
+          'executivePower': 'kill',
+          'executiveActive': true,
+          'phase': 'executive_kill',
+          'executiveTarget': null,
+        });
       }
     });
 
-    //power activation
+    // Normal round (no executive) -> rotate HM
     if (!execTriggered) {
-      await _rotateHeadmaster(lobbyId); // normal round
+      await _rotateHeadmaster(lobbyId);
     }
-    //rotation at end
   }
 
 
@@ -526,8 +671,6 @@ class FirebaseController {
 
     late int numWarlocks;   // includes ArchWarlock inside
     late bool archSeesWarlocks;  
-
-    // Player count rules — themed version of Secret Hitler rules
     if (n == 5) {
       numWarlocks = 2;       // 1 ArchWarlock + 1 Warlock
       archSeesWarlocks = false;

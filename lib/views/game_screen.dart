@@ -10,6 +10,11 @@ import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/views/game_view.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
 
+// NEW OVERLAY IMPORTS
+import 'package:secret_sorcerer/views/overlays/policy_overlay.dart';
+import 'package:secret_sorcerer/views/overlays/voting_overlay.dart';
+import 'package:secret_sorcerer/views/overlays/executive_overlays.dart';
+
 class GameScreen extends StatefulWidget {
   final String code;
   const GameScreen({super.key, required this.code});
@@ -120,21 +125,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           final isHM = g.isHeadmasterClient;
                           final isSC = g.isSpellcasterClient;
 
-                          final showHMDiscard = isHM &&
-                              g.phase == 'hm_discard' &&
-                              g.pendingCards.length == 3;
+                          final clientUid = _uid ?? '';
+                          final isDeadClient = g.dead[clientUid] == true;
+                          final isHost = _uid == _creatorId;
 
-                          final showSCChoose = isSC &&
-                              g.phase == 'sc_choose' &&
-                              g.pendingCards.length == 2;
+                          final showHMDiscard =
+                              isHM && g.phase == 'hm_discard' && g.pendingCards.length == 3;
 
-                          final showVoting = (g.phase == 'voting' ||
-                                  g.phase == 'voting_results') &&
-                              !isHM;
+                          final showSCChoose =
+                              isSC && g.phase == 'sc_choose' && g.pendingCards.length == 2;
+
+                          //Dead players do NOT see the vote screen, but DO see results
+                          final showVoting =
+                              (g.phase == 'voting' && !isHM && !isDeadClient) ||
+                              (g.phase == 'voting_results' && !isHM);
 
                           // Executive power text + upcoming warning
-                          final String? nextExecHint =
-                              _nextExecutiveWarning(g);
+                          final String? nextExecHint = _nextExecutiveWarning(g);
                           final String? activeExecText =
                               (g.executivePower == 'investigate' &&
                                       g.phase == 'executive_investigate')
@@ -142,48 +149,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                   : (g.executivePower == 'peek3' &&
                                           g.phase == 'executive_peek3')
                                       ? 'Executive Power active: Foresight – Headmaster, view the next three spells.'
-                                      : null;
-
-                          // Responsive card builder with staggered fade/scale
-                          Widget cardWidget(
-                            String type,
-                            VoidCallback onTap,
-                            int index,
-                          ) {
-                            final cardHeight = height * 0.18;
-                            final cardWidth = width * 0.25;
-                            final asset = type == 'charm'
-                                ? 'assets/images/game-assets/board/charmCard.png'
-                                : 'assets/images/game-assets/board/curseCard.png';
-
-                            return _StaggerFadeScale(
-                              delayMs: 150 * index,
-                              durationMs: 400,
-                              beginScale: 0.9,
-                              endScale: 1.0,
-                              child: InkWell(
-                                onTap: onTap,
-                                child: Container(
-                                  margin: EdgeInsets.symmetric(
-                                    horizontal: width * 0.015,
-                                  ),
-                                  padding: EdgeInsets.all(width * 0.02),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border:
-                                        Border.all(color: Colors.white24),
-                                  ),
-                                  child: Image.asset(
-                                    asset,
-                                    height: cardHeight,
-                                    width: cardWidth,
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
+                                      : (g.executivePower == 'choose_next_hm' &&
+                                              g.phase == 'executive_choose_hm')
+                                          ? 'Executive Power active: Choose the next Headmaster – tap a wizard’s hat.'
+                                          : (g.executivePower == 'kill' &&
+                                                  g.phase == 'executive_kill')
+                                              ? 'Executive Power active: Cast a lethal spell – tap a wizard to eliminate them.'
+                                              : null;
 
                           Widget rolePill(String text) {
                             return Container(
@@ -192,8 +164,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                 vertical: height * 0.012,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.secondaryBrand
-                                    .withOpacity(0.7),
+                                color: AppColors.secondaryBrand.withOpacity(0.7),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Text(
@@ -202,334 +173,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                   color: AppColors.textAccent,
                                   fontSize: height * 0.02,
                                 ),
-                              ),
-                            );
-                          }
-
-                          Widget buildCardOverlay(
-                            String title,
-                            List<String> cards,
-                            bool isHMPhase,
-                          ) {
-                            return AnimatedOpacity(
-                              opacity: 1,
-                              duration: const Duration(milliseconds: 300),
-                              child: Container(
-                                width: double.infinity,
-                                height: double.infinity,
-                                color: Colors.black.withOpacity(0.65),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        title,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: height * 0.025,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      SizedBox(height: height * 0.02),
-                                      SizedBox(
-                                        width: width * 0.9,
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: List.generate(
-                                              cards.length,
-                                              (i) {
-                                                final type = cards[i];
-                                                return cardWidget(
-                                                  type,
-                                                  () => isHMPhase
-                                                      ? g.headmasterDiscard(i)
-                                                      : g.spellcasterChoose(i),
-                                                  i,
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-
-                          String nomineeName() {
-                            if (g.nomineeIndex == null ||
-                                g.nomineeIndex! < 0 ||
-                                g.nomineeIndex! >= g.players.length) {
-                              return 'the Spellcaster';
-                            }
-                            final uid =
-                                g.players[g.nomineeIndex!].username;
-                            return g.nicknameCache[uid] ?? 'the Spellcaster';
-                          }
-
-                          // Simple line showing who voted what
-                          Widget voteRow(String name, bool yes) {
-                            return Padding(
-                              padding: EdgeInsets.symmetric(
-                                vertical: height * 0.006,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    yes
-                                        ? Icons.check_circle
-                                        : Icons.cancel,
-                                    color: yes
-                                        ? Colors.greenAccent
-                                        : Colors.redAccent,
-                                    size: height * 0.022,
-                                  ),
-                                  SizedBox(width: width * 0.02),
-                                  Text(
-                                    name,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: height * 0.02,
-                                    ),
-                                  ),
-                                  SizedBox(width: width * 0.02),
-                                  Text(
-                                    yes ? 'Yes' : 'No',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: height * 0.018,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-
-                          Widget buildVoteOverlay() {
-                            final cardH = height * 0.2;
-                            final cardW = width * 0.28;
-
-                            // Optimistic “I voted” (local) OR confirmed from Firestore
-                            final iVotedNow =
-                                _myVoteCastLocal || g.iVoted;
-                            final allIn = g.allVotesIn ||
-                                g.phase == 'voting_results';
-
-                            // Build tallies and names when all votes are in
-                            List<Widget> results = [];
-                            if (allIn) {
-                              int yesCount = 0;
-                              int noCount = 0;
-                              g.votes.forEach((uid, val) {
-                                final name =
-                                    g.nicknameCache[uid] ?? 'Wizard';
-                                results.add(voteRow(name, val));
-                                if (val) {
-                                  yesCount++;
-                                } else {
-                                  noCount++;
-                                }
-                              });
-
-                              final passed = yesCount > noCount;
-                              results.add(SizedBox(height: height * 0.02));
-                              results.add(
-                                Text(
-                                  passed
-                                      ? 'Election Passed'
-                                      : 'Election Failed',
-                                  style: TextStyle(
-                                    color: passed
-                                        ? Colors.greenAccent
-                                        : Colors.redAccent,
-                                    fontSize: height * 0.024,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              );
-                            }
-
-                            Widget voteCard(
-                              String asset,
-                              VoidCallback onTap,
-                              int index, {
-                              String label = '',
-                            }) {
-                              return _StaggerFadeScale(
-                                delayMs: 150 * index,
-                                durationMs: 420,
-                                beginScale: 0.92,
-                                endScale: 1.0,
-                                child: InkWell(
-                                  onTap: () async {
-                                    if (iVotedNow) return;
-                                    setState(() {
-                                      _myVoteCastLocal = true;
-                                    }); // instant feedback
-                                    await g.castVote(asset.contains('yes'));
-                                  },
-                                  child: Column(
-                                    children: [
-                                      Container(
-                                        margin: EdgeInsets.symmetric(
-                                          horizontal: width * 0.02,
-                                        ),
-                                        padding: EdgeInsets.all(
-                                          width * 0.02,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.08),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: Colors.white24,
-                                          ),
-                                        ),
-                                        child: Image.asset(
-                                          asset,
-                                          height: cardH,
-                                          width: cardW,
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ),
-                                      if (label.isNotEmpty)
-                                        SizedBox(
-                                          height: height * 0.008,
-                                        ),
-                                      if (label.isNotEmpty)
-                                        Text(
-                                          label,
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: height * 0.018,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }
-
-                            // Three states on the SAME dark overlay:
-                            // 1) Not voted yet -> show Yes/No cards
-                            // 2) Voted but not all in -> “Vote has been cast”
-                            // 3) All in -> show tally + result
-                            Widget inner;
-                            if (!iVotedNow && !allIn) {
-                              inner = Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Vote to elect ${nomineeName()} as Spellcaster',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: height * 0.026,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  SizedBox(height: height * 0.018),
-                                  Text(
-                                    'Choose wisely, wizard…',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: height * 0.018,
-                                    ),
-                                  ),
-                                  SizedBox(height: height * 0.03),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
-                                    children: [
-                                      voteCard(
-                                        'assets/images/game-assets/board/yesCard.png',
-                                        () {},
-                                        0,
-                                        label: 'Yes',
-                                      ),
-                                      voteCard(
-                                        'assets/images/game-assets/board/noCard.png',
-                                        () {},
-                                        1,
-                                        label: 'No',
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              );
-                            } else if (iVotedNow && !allIn) {
-                              inner = Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.how_to_vote,
-                                    color: Colors.white70,
-                                    size: height * 0.06,
-                                  ),
-                                  SizedBox(height: height * 0.015),
-                                  Text(
-                                    'Vote has been cast — waiting for others…',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: height * 0.022,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  SizedBox(height: height * 0.01),
-                                  Text(
-                                    '${g.votedCount}/${g.eligibleVoters} votes in',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: height * 0.018,
-                                    ),
-                                  ),
-                                  SizedBox(height: height * 0.02),
-                                  const CircularProgressIndicator(
-                                    color: Colors.white70,
-                                  ),
-                                ],
-                              );
-                            } else {
-                              // allIn == true
-                              inner = Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Voting Results',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: height * 0.026,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  SizedBox(height: height * 0.02),
-                                  ...results,
-                                  SizedBox(height: height * 0.02),
-                                  Text(
-                                    'Continuing…',
-                                    style: TextStyle(
-                                      color: Colors.white60,
-                                      fontSize: height * 0.016,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }
-
-                            return AnimatedOpacity(
-                              opacity: 1,
-                              duration: const Duration(milliseconds: 300),
-                              child: Container(
-                                width: double.infinity,
-                                height: double.infinity,
-                                color: Colors.black.withOpacity(0.68),
-                                child: Center(child: inner),
                               ),
                             );
                           }
@@ -548,44 +191,33 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                     ),
                                     style: ButtonStyle(
                                       backgroundColor:
-                                          MaterialStateProperty.all(
-                                        Colors.black.withOpacity(0.4),
-                                      ),
-                                      padding:
-                                          MaterialStateProperty.all(
+                                          MaterialStateProperty.all(Colors.black.withOpacity(0.4)),
+                                      padding: MaterialStateProperty.all(
                                         EdgeInsets.all(width * 0.025),
                                       ),
                                     ),
                                     onPressed: () async {
-                                      final confirmed =
-                                          await showDialog<bool>(
+                                      final confirmed = await showDialog<bool>(
                                         context: context,
                                         builder: (context) => AlertDialog(
                                           backgroundColor: Colors.black87,
                                           title: const Text(
                                             "End Game?",
-                                            style: TextStyle(
-                                                color: Colors.white),
+                                            style: TextStyle(color: Colors.white),
                                           ),
                                           content: const Text(
                                             "Send everyone back to the lobby?",
-                                            style: TextStyle(
-                                                color: Colors.white70),
+                                            style: TextStyle(color: Colors.white70),
                                           ),
                                           actions: [
                                             TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(
-                                                      context, false),
+                                              onPressed: () => Navigator.pop(context, false),
                                               child: const Text("Cancel"),
                                             ),
                                             ElevatedButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(
-                                                      context, true),
+                                              onPressed: () => Navigator.pop(context, true),
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor:
-                                                    Colors.amberAccent,
+                                                backgroundColor: Colors.amberAccent,
                                               ),
                                               child: const Text("Yes, return"),
                                             ),
@@ -597,8 +229,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                             .collection('states')
                                             .doc(widget.code)
                                             .delete();
-                                        await _firebase
-                                            .resetLobby(widget.code);
+                                        await _firebase.resetLobby(widget.code);
                                       }
                                     },
                                   ),
@@ -608,9 +239,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                               Align(
                                 alignment: Alignment.topCenter,
                                 child: Padding(
-                                  padding: EdgeInsets.only(
-                                    top: height * 0.02,
-                                  ),
+                                  padding: EdgeInsets.only(top: height * 0.02),
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -623,9 +252,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                       ),
                                       if (activeExecText != null)
                                         Padding(
-                                          padding: EdgeInsets.only(
-                                            top: height * 0.008,
-                                          ),
+                                          padding: EdgeInsets.only(top: height * 0.008),
                                           child: Text(
                                             activeExecText,
                                             textAlign: TextAlign.center,
@@ -638,9 +265,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                         )
                                       else if (nextExecHint != null)
                                         Padding(
-                                          padding: EdgeInsets.only(
-                                            top: height * 0.008,
-                                          ),
+                                          padding: EdgeInsets.only(top: height * 0.008),
                                           child: Text(
                                             nextExecHint,
                                             textAlign: TextAlign.center,
@@ -655,290 +280,100 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                 ),
                               ),
 
-                              // Policy card overlays
-                              if (showHMDiscard)
-                                buildCardOverlay(
-                                  'Choose 1 spell to discard',
-                                  g.pendingCards,
-                                  true,
+                              // POLICY CARD OVERLAY (HM discard / SC choose)
+                              if (showHMDiscard || showSCChoose)
+                                PolicyOverlay(
+                                  game: g,
+                                  height: height,
+                                  width: width,
+                                  isHMPhase: showHMDiscard,
                                 ),
 
-                              if (showSCChoose)
-                                buildCardOverlay(
-                                  'Choose 1 spell to cast',
-                                  g.pendingCards,
-                                  false,
+                              // VOTING OVERLAY
+                              if (showVoting)
+                                VotingOverlay(
+                                  game: g,
+                                  height: height,
+                                  width: width,
+                                  myVoteCastLocal: _myVoteCastLocal,
+                                  onVote: (yes) async {
+                                    if (_myVoteCastLocal || g.iVoted) return;
+                                    setState(() {
+                                      _myVoteCastLocal = true;
+                                    });
+                                    await g.castVote(yes);
+                                  },
                                 ),
 
-                              if (showVoting) buildVoteOverlay(),
-
-                              // EXECUTIVE POWER - INVESTIGATE SELECTION
+                              // EXECUTIVE: INVESTIGATE
                               if (g.phase == 'executive_investigate')
-                                Stack(
-                                  children: [
-                                    if (!isHM)
-                                      Positioned.fill(
-                                        child: Container(
-                                          color: Colors.black
-                                              .withOpacity(0.55),
-                                          child: Center(
-                                            child: Text(
-                                              "Headmaster is investigating…",
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: height * 0.028,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-
-                                    if (isHM)
-                                      Positioned(
-                                        top: height * 0.18,
-                                        left: 0,
-                                        right: 0,
-                                        child: Center(
-                                          child: Text(
-                                            "Tap a wizard to investigate their loyalty",
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: height * 0.024,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                                ExecutiveInvestigateOverlay(
+                                  isHeadmaster: isHM,
+                                  height: height,
                                 ),
 
-                              // EXECUTIVE POWER -> INVESTIGATE RESULT
                               if (g.phase == 'executive_investigate_result')
-                                Stack(
-                                  children: [
-                                    if (!isHM)
-                                      Positioned.fill(
-                                        child: Container(
-                                          color: Colors.black
-                                              .withOpacity(0.60),
-                                          child: Center(
-                                            child: Text(
-                                              "Headmaster is reviewing loyalty…",
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: height * 0.026,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    if (isHM)
-                                      Center(
-                                        child: Container(
-                                          padding: EdgeInsets.all(
-                                            height * 0.025,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black
-                                                .withOpacity(0.75),
-                                            borderRadius:
-                                                BorderRadius.circular(14),
-                                          ),
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                "Loyalty Revealed",
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: height * 0.030,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              SizedBox(
-                                                  height: height * 0.02),
-                                              if (g.executiveTarget != null) ...[
-                                                Text(
-                                                  "${g.nicknameCache[g.executiveTarget] ?? "Wizard"} is a:",
-                                                  style: TextStyle(
-                                                    color: Colors.white70,
-                                                    fontSize: height * 0.022,
-                                                  ),
-                                                ),
-                                                Builder(
-                                                  builder: (_) {
-                                                    final targetRole = g.players
-                                                        .firstWhere((p) =>
-                                                            p.username ==
-                                                            g.executiveTarget!)
-                                                        .role;
-                                                    final loyalty =
-                                                        (targetRole ==
-                                                                'wizard')
-                                                            ? 'WIZARD'
-                                                            : 'WARLOCK';
-                                                    final loyaltyColor =
-                                                        (loyalty ==
-                                                                'WARLOCK')
-                                                            ? Colors
-                                                                .redAccent
-                                                            : Colors
-                                                                .lightBlueAccent;
-
-                                                    return Text(
-                                                      loyalty,
-                                                      style: TextStyle(
-                                                        color: loyaltyColor,
-                                                        fontSize:
-                                                            height * 0.033,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                              ],
-                                              SizedBox(
-                                                  height: height * 0.035),
-                                              ElevatedButton(
-                                                onPressed: () =>
-                                                    FirebaseController()
-                                                        .endExecutive(
-                                                  widget.code,
-                                                ),
-                                                child: const Text("Continue"),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                                ExecutiveInvestigateResultOverlay(
+                                  game: g,
+                                  isHeadmaster: isHM,
+                                  height: height,
+                                  onContinue: () => _firebase.endExecutive(widget.code),
                                 ),
 
-                                // EXECUTIVE POWER -> PEEK 3 CARDS
-                                if (g.phase == 'executive_peek3')
-                                  Stack(
-                                    children: [
-                                      if (!isHM)
-                                        Positioned.fill(
-                                          child: Container(
-                                            color: Colors.black.withOpacity(0.60),
-                                            child: Center(
-                                              child: Text(
-                                                "Headmaster is foreseeing future spells…",
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  color: Colors.white70,
-                                                  fontSize: height * 0.026,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
+                              if (g.phase == 'executive_peek3')
+                                ExecutivePeek3Overlay(
+                                  game: g,
+                                  isHeadmaster: isHM,
+                                  height: height,
+                                  width: width,
+                                  onContinue: () => _firebase.endExecutive(widget.code),
+                                ),
 
-                                      
-                                      if (isHM)
-                                        AnimatedOpacity(
-                                          opacity: 1,
-                                          duration: const Duration(milliseconds: 300),
-                                          child: Container(
-                                            width: double.infinity,
-                                            height: double.infinity,
-                                            color: Colors.black.withOpacity(0.65),
-                                            child: Center(
-                                              child: Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    "Next Three Spells",
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: height * 0.028,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
+                              if (g.phase == 'executive_choose_hm')
+                                ExecutiveChooseHeadmasterOverlay(
+                                  isHeadmaster: isHM,
+                                  height: height,
+                                ),
 
-                                                  SizedBox(height: height * 0.02),
+                              if (g.phase == 'executive_choose_hm_result')
+                                ExecutiveChooseHeadmasterResultOverlay(
+                                  game: g,
+                                  isHeadmaster: isHM,
+                                  height: height,
+                                  onConfirm: () =>
+                                      _firebase.confirmNextHeadmaster(widget.code),
+                                ),
 
-                                                 
-                                                  SizedBox(
-                                                    width: width * 0.9,
-                                                    child: FittedBox(
-                                                      fit: BoxFit.scaleDown,
-                                                      child: Row(
-                                                        mainAxisAlignment: MainAxisAlignment.center,
-                                                        children: List.generate(
-                                                          g.pendingExecutiveCards.length,
-                                                          (i) {
-                                                            final type = g.pendingExecutiveCards[i];
-                                                            final asset = type == 'charm'
-                                                                ? 'assets/images/game-assets/board/charmCard.png'
-                                                                : 'assets/images/game-assets/board/curseCard.png';
+                              if (g.phase == 'executive_kill')
+                                ExecutiveKillOverlay(
+                                  isHeadmaster: isHM,
+                                  height: height,
+                                ),
 
-                                                            return _StaggerFadeScale(
-                                                              delayMs: 150 * i,
-                                                              durationMs: 400,
-                                                              beginScale: 0.9,
-                                                              endScale: 1.0,
-                                                              child: Container(
-                                                                margin: EdgeInsets.symmetric(
-                                                                    horizontal: width * 0.015),
-                                                                padding: EdgeInsets.all(width * 0.02),
-                                                                decoration: BoxDecoration(
-                                                                  color: Colors.white.withOpacity(0.10),
-                                                                  borderRadius: BorderRadius.circular(12),
-                                                                  border: Border.all(color: Colors.white24),
-                                                                ),
-                                                                child: Image.asset(
-                                                                  asset,
-                                                                  height: height * 0.18,
-                                                                  width: width * 0.25,
-                                                                  fit: BoxFit.contain,
-                                                                ),
-                                                              ),
-                                                            );
-                                                          },
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-
-                                                  SizedBox(height: height * 0.035),
-
-                                                  ElevatedButton(
-                                                    onPressed: () => FirebaseController().endExecutive(widget.code),
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: Colors.white,
-                                                      foregroundColor: Colors.black,
-                                                      padding: EdgeInsets.symmetric(
-                                                        horizontal: width * 0.08,
-                                                        vertical: height * 0.015,
-                                                      ),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(12),
-                                                      ),
-                                                    ),
-                                                    child: Text(
-                                                      "Continue",
-                                                      style: TextStyle(
-                                                        fontSize: height * 0.022,
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
+                              //EXECUTIVE KILL RESULT – host only actually resolves
+                              if (g.phase == 'executive_kill_result' ||
+                                  g.phase == 'executive_kill_result_arch')
+                                ExecutiveKillResultOverlay(
+                                  game: g,
+                                  height: height,
+                                  width: width,
+                                  isArch: g.phase == 'executive_kill_result_arch',
+                                  isHost: isHost,
+                                  onContinue: isHost
+                                      ? () async {
+                                          if (g.phase == 'executive_kill_result_arch') {
+                                            // GAME OVER
+                                            await FirebaseFirestore.instance
+                                                .collection('states')
+                                                .doc(widget.code)
+                                                .delete();
+                                            await _firebase.resetLobby(widget.code);
+                                          } else {
+                                            await _firebase.finalizeKill(widget.code);
+                                          }
+                                        }
+                                      : null,
+                                ),
 
                               // Spectator hint (only if no blocking overlays)
                               if (!showHMDiscard &&
@@ -946,13 +381,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                   !showVoting &&
                                   g.phase != 'executive_investigate' &&
                                   g.phase != 'executive_investigate_result' &&
-                                  g.phase != 'executive_peek3')
+                                  g.phase != 'executive_peek3' &&
+                                  g.phase != 'executive_choose_hm' &&
+                                  g.phase != 'executive_kill' &&
+                                  g.phase != 'executive_kill_result' &&
+                                  g.phase != 'executive_kill_result_arch')
                                 Align(
                                   alignment: Alignment.bottomCenter,
                                   child: Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: height * 0.05,
-                                    ),
+                                    padding: EdgeInsets.only(bottom: height * 0.05),
                                     child: Text(
                                       _spectatorHint(g),
                                       style: TextStyle(
@@ -965,6 +402,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                             ],
                           );
                         },
+
                       },
                     ),
                   ],
@@ -993,6 +431,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         return 'Investigation complete – resolving…';
       case 'executive_peek3':
         return 'Headmaster is peeking at the next three spells…';
+      case 'executive_choose_hm':
+        return 'Headmaster is choosing the next Headmaster…';
+      case 'executive_kill':
+        return 'A lethal spell is about to be cast…';
       case 'resolving':
         return 'Resolving policy and rotating Headmaster...';
       default:
@@ -1007,95 +449,45 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // Never show warning DURING an executive power
     if (g.executiveActive == true) return null;
 
-    //5-6 PLAYERS
+    // 5–6 PLAYERS
     if (playerCount >= 1 && playerCount <= 6) {
-      if (curses == 2) return "If the next Curse is enacted: Foresee three spells.";
-      if (curses == 3) return "If the next Curse is enacted: Execute a wizard.";
+      if (curses == 2) {
+        return "If the next Curse is enacted: Foresee three spells.";
+      }
+      if (curses == 3) {
+        return "If the next Curse is enacted: Execute a wizard.";
+      }
     }
 
-    //7-8 PLAYERS
+    // 7–8 PLAYERS
     if (playerCount >= 7 && playerCount <= 8) {
-      if (curses == 1) return "If the next Curse is enacted: Investigate Loyalty.";
-      if (curses == 2) return "If the next Curse is enacted: Foresee three spells.";
-      if (curses == 3) return "If the next Curse is enacted: Execute a wizard.";
+      if (curses == 1) {
+        return "If the next Curse is enacted: Investigate Loyalty.";
+      }
+      if (curses == 2) {
+        return "If the next Curse is enacted: Foresee three spells.";
+      }
+      if (curses == 3) {
+        return "If the next Curse is enacted: Execute a wizard.";
+      }
     }
 
-    //9-10 PLAYERS
+    // 9–10 PLAYERS
     if (playerCount >= 9 && playerCount <= 10) {
-      if (curses == 0) return "If the next Curse is enacted: Investigate Loyalty.";
-      if (curses == 1) return "If the next Curse is enacted: Investigate Loyalty.";
-      if (curses == 2) return "If the next Curse is enacted: Foresee three spells.";
-      if (curses == 3) return "If the next Curse is enacted: Execute a wizard.";
+      if (curses == 0) {
+        return "If the next Curse is enacted: Investigate Loyalty.";
+      }
+      if (curses == 1) {
+        return "If the next Curse is enacted: Investigate Loyalty.";
+      }
+      if (curses == 2) {
+        return "If the next Curse is enacted: Foresee three spells.";
+      }
+      if (curses == 3) {
+        return "If the next Curse is enacted: Execute a wizard.";
+      }
     }
 
     return null;
-  }
-}
-
-// Simple helper to add a start delay and fade/scale animation to any child.
-class _StaggerFadeScale extends StatefulWidget {
-  final Widget child;
-  final int delayMs;
-  final int durationMs;
-  final double beginScale;
-  final double endScale;
-
-  const _StaggerFadeScale({
-    required this.child,
-    required this.delayMs,
-    required this.durationMs,
-    this.beginScale = 0.9,
-    this.endScale = 1.0,
-  });
-
-  @override
-  State<_StaggerFadeScale> createState() => _StaggerFadeScaleState();
-}
-
-class _StaggerFadeScaleState extends State<_StaggerFadeScale>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _opacity;
-  late final Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: widget.durationMs),
-    );
-    _opacity = CurvedAnimation(
-      parent: _ctrl,
-      curve: Curves.easeOut,
-    );
-    _scale = Tween<double>(
-      begin: widget.beginScale,
-      end: widget.endScale,
-    ).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
-    );
-
-    // Start after delay
-    Future.delayed(Duration(milliseconds: widget.delayMs), () {
-      if (mounted) _ctrl.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _opacity,
-      child: ScaleTransition(
-        scale: _scale,
-        child: widget.child,
-      ),
-    );
   }
 }
