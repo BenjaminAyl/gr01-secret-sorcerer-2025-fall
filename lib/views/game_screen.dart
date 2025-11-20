@@ -10,10 +10,19 @@ import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/views/game_view.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
 
-// NEW OVERLAY IMPORTS
+// CLEAN NOTIFICATION & SCROLL OVERLAYS
+import 'package:secret_sorcerer/views/overlays/game_notification_bar.dart';
+import 'package:secret_sorcerer/views/overlays/role_scroll_overlay.dart';
+
+// Existing overlays
 import 'package:secret_sorcerer/views/overlays/policy_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/voting_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/executive_overlays.dart';
+
+// WIN SCREEN
+import 'package:secret_sorcerer/views/overlays/game_win_overlay.dart';
+
+
 
 class GameScreen extends StatefulWidget {
   final String code;
@@ -23,55 +32,55 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
+class _GameScreenState extends State<GameScreen>
+    with TickerProviderStateMixin {
   final _firebase = FirebaseController();
   late final WizardGameView _game;
   String? _creatorId;
   String? _uid;
   bool _navigatedOut = false;
 
-  // local “I clicked” flag so the UI confirms instantly
   bool _myVoteCastLocal = false;
 
   @override
   void initState() {
     super.initState();
-
     _uid = FirebaseAuth.instance.currentUser?.uid;
-    final myUid = _uid ?? "unknown";
-    _game = WizardGameView(lobbyId: widget.code, myUid: myUid);
 
-    // Switch from lobby music to game music
-    AudioHelper.crossfade('TavernMusic.wav');
+    _game = WizardGameView(
+      lobbyId: widget.code,
+      myUid: _uid!,
+    );
+
+    AudioHelper.crossfade("TavernMusic.wav");
   }
 
   @override
   Widget build(BuildContext context) {
-    final lobbyRef =
-        FirebaseFirestore.instance.collection('lobbies').doc(widget.code);
-    final stateRef =
-        FirebaseFirestore.instance.collection('states').doc(widget.code);
+    final lobbyRef = FirebaseFirestore.instance
+        .collection('lobbies')
+        .doc(widget.code);
+
+    final stateRef = FirebaseFirestore.instance
+        .collection('states')
+        .doc(widget.code);
 
     final size = MediaQuery.of(context).size;
     final width = size.width;
     final height = size.height;
 
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    return StreamBuilder(
       stream: lobbyRef.snapshots(),
       builder: (context, lobbySnap) {
-        if (!lobbySnap.hasData || lobbySnap.hasError) {
+        if (!lobbySnap.hasData) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        final lobbyData = lobbySnap.data?.data();
-        if (lobbyData == null) return const SizedBox.shrink();
+        _creatorId ??= lobbySnap.data!.data()?['creatorId'];
 
-        final lobby = lobbySnap.data!.data()!;
-        _creatorId ??= lobby['creatorId'] as String?;
-
-        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        return StreamBuilder(
           stream: stateRef.snapshots(),
           builder: (context, stateSnap) {
             if (!stateSnap.hasData) {
@@ -80,10 +89,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               );
             }
 
-            // If state doc was deleted then go return to lobby
+            // If the state was deleted → return to lobby
             if (!stateSnap.data!.exists) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted && !_navigatedOut) {
+                if (!_navigatedOut) {
                   _navigatedOut = true;
                   context.go('/lobby/${widget.code}');
                 }
@@ -92,31 +101,35 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             }
 
             final rawState = stateSnap.data!.data();
-            if (rawState == null) {
-              return const SizedBox.shrink();
-            }
+            if (rawState == null) return const SizedBox.shrink();
 
-            // Safety: sometimes phase might not be set yet
-            final phase = rawState['phase'] ?? 'start';
-            _game.phase = phase;
+            // Assign live state fields
+            _game.phase = rawState['phase'] ?? 'start';
             _game.executivePower = rawState['executivePower'];
             _game.executiveActive = rawState['executiveActive'] == true;
             _game.executiveTarget = rawState['executiveTarget'];
             _game.pendingExecutiveCards =
                 List<String>.from(rawState['pendingExecutiveCards'] ?? []);
 
-            // Reset optimistic flag when voting ends
-            if (phase != 'voting' &&
-                phase != 'voting_results' &&
-                _myVoteCastLocal) {
+            if (_game.phase != 'voting' &&
+                _game.phase != 'voting_results') {
               _myVoteCastLocal = false;
             }
+
+            // --- WIN SCREEN FIELDS ---
+            final winnerTeam = rawState['winnerTeam'];
+            final bool isGameOver =
+                _game.phase == 'game_over' && winnerTeam != null;
+
+
 
             return Scaffold(
               backgroundColor: AppColors.primaryBrand,
               body: SafeArea(
                 child: Stack(
                   children: [
+
+                    // --- MAIN GAME BOARD ---
                     GameWidget(
                       game: _game,
                       overlayBuilderMap: {
@@ -124,107 +137,94 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           final g = game as WizardGameView;
                           final isHM = g.isHeadmasterClient;
                           final isSC = g.isSpellcasterClient;
-
-                          final clientUid = _uid ?? '';
-                          final isDeadClient = g.dead[clientUid] == true;
+                          final isDead = g.dead[_uid] == true;
                           final isHost = _uid == _creatorId;
 
                           final showHMDiscard =
-                              isHM && g.phase == 'hm_discard' && g.pendingCards.length == 3;
+                              isHM &&
+                              g.phase == 'hm_discard' &&
+                              g.pendingCards.length == 3;
 
                           final showSCChoose =
-                              isSC && g.phase == 'sc_choose' && g.pendingCards.length == 2;
+                              isSC &&
+                              g.phase == 'sc_choose' &&
+                              g.pendingCards.length == 2;
 
-                          //Dead players do NOT see the vote screen, but DO see results
                           final showVoting =
-                              (g.phase == 'voting' && !isHM && !isDeadClient) ||
+                              (g.phase == 'voting' && !isHM && !isDead) ||
                               (g.phase == 'voting_results' && !isHM);
 
-                          // Executive power text + upcoming warning
-                          final String? nextExecHint = _nextExecutiveWarning(g);
-                          final String? activeExecText =
-                              (g.executivePower == 'investigate' &&
-                                      g.phase == 'executive_investigate')
-                                  ? 'Executive Power active: Investigate Loyalty – Headmaster, tap a hat to inspect a wizard.'
-                                  : (g.executivePower == 'peek3' &&
-                                          g.phase == 'executive_peek3')
-                                      ? 'Executive Power active: Foresight – Headmaster, view the next three spells.'
-                                      : (g.executivePower == 'choose_next_hm' &&
-                                              g.phase == 'executive_choose_hm')
-                                          ? 'Executive Power active: Choose the next Headmaster – tap a wizard’s hat.'
-                                          : (g.executivePower == 'kill' &&
-                                                  g.phase == 'executive_kill')
-                                              ? 'Executive Power active: Cast a lethal spell – tap a wizard to eliminate them.'
-                                              : null;
+                          // --- TOP UI (ROLE PILL + NOTIF BAR) ---
+                          Widget topHUD = Column(
+                            children: [
+                              SizedBox(height: height * 0.012),
 
-                          Widget rolePill(String text) {
-                            return Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: width * 0.04,
-                                vertical: height * 0.012,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.secondaryBrand.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(
-                                text,
-                                style: TextStyles.bodySmall.copyWith(
-                                  color: AppColors.textAccent,
-                                  fontSize: height * 0.02,
+                              // ROLE PILL
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: width * 0.05,
+                                  vertical: height * 0.01,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondaryBrand.withOpacity(0.75),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Text(
+                                  isHM
+                                      ? "You are the Headmaster"
+                                      : isSC
+                                          ? "You are the Spellcaster"
+                                          : "You are a Wizard",
+                                  style: TextStyles.bodySmall.copyWith(
+                                    fontSize: height * 0.02,
+                                    color: AppColors.textAccent,
+                                  ),
                                 ),
                               ),
-                            );
-                          }
+
+                              SizedBox(height: height * 0.005),
+
+                              GameNotificationBar(
+                                game: g,
+                                isHM: isHM,
+                                isSC: isSC,
+                                width: width,
+                                height: height,
+                              ),
+                            ],
+                          );
+
+                          // Hide scroll when overlays active
+                          final bool showScroll =
+                              !showHMDiscard &&
+                              !showSCChoose &&
+                              !showVoting &&
+                              g.phase != 'executive_investigate' &&
+                              g.phase != 'executive_investigate_result' &&
+                              g.phase != 'executive_peek3' &&
+                              g.phase != 'executive_choose_hm' &&
+                              g.phase != 'executive_choose_hm_result' &&
+                              g.phase != 'executive_kill' &&
+                              g.phase != 'executive_kill_result' &&
+                              g.phase != 'executive_kill_result_arch' &&
+                              !isDead;
 
                           return Stack(
                             children: [
-                              // Top-left back button (host only)
-                              if (_uid == _creatorId)
+
+                              // BACK BUTTON (HOST)
+                              if (isHost)
                                 Positioned(
-                                  top: height * 0.02,
-                                  left: width * 0.03,
+                                  top: height * 0.015,
+                                  left: width * 0.02,
                                   child: IconButton(
                                     icon: const Icon(
                                       Icons.arrow_back_ios_new,
                                       color: Colors.white,
                                     ),
-                                    style: ButtonStyle(
-                                      backgroundColor:
-                                          MaterialStateProperty.all(Colors.black.withOpacity(0.4)),
-                                      padding: MaterialStateProperty.all(
-                                        EdgeInsets.all(width * 0.025),
-                                      ),
-                                    ),
                                     onPressed: () async {
-                                      final confirmed = await showDialog<bool>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          backgroundColor: Colors.black87,
-                                          title: const Text(
-                                            "End Game?",
-                                            style: TextStyle(color: Colors.white),
-                                          ),
-                                          content: const Text(
-                                            "Send everyone back to the lobby?",
-                                            style: TextStyle(color: Colors.white70),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(context, false),
-                                              child: const Text("Cancel"),
-                                            ),
-                                            ElevatedButton(
-                                              onPressed: () => Navigator.pop(context, true),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.amberAccent,
-                                              ),
-                                              child: const Text("Yes, return"),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      if (confirmed == true) {
+                                      final ok = await _confirmEndGame(context);
+                                      if (ok == true) {
                                         await FirebaseFirestore.instance
                                             .collection('states')
                                             .doc(widget.code)
@@ -235,61 +235,28 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                   ),
                                 ),
 
-                              // Top-center role + exec info
                               Align(
                                 alignment: Alignment.topCenter,
-                                child: Padding(
-                                  padding: EdgeInsets.only(top: height * 0.02),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      rolePill(
-                                        isHM
-                                            ? 'You are the Headmaster'
-                                            : (isSC
-                                                ? 'You are the Spellcaster'
-                                                : 'Waiting for others...'),
-                                      ),
-                                      if (activeExecText != null)
-                                        Padding(
-                                          padding: EdgeInsets.only(top: height * 0.008),
-                                          child: Text(
-                                            activeExecText,
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: Colors.amberAccent,
-                                              fontSize: height * 0.018,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        )
-                                      else if (nextExecHint != null)
-                                        Padding(
-                                          padding: EdgeInsets.only(top: height * 0.008),
-                                          child: Text(
-                                            nextExecHint,
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: height * 0.017,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
+                                child: topHUD,
                               ),
 
-                              // POLICY CARD OVERLAY (HM discard / SC choose)
-                              if (showHMDiscard || showSCChoose)
+                              // POLICY / SC / VOTE / EXEC OVERLAYS
+                              if (showHMDiscard)
                                 PolicyOverlay(
                                   game: g,
                                   height: height,
                                   width: width,
-                                  isHMPhase: showHMDiscard,
+                                  isHMPhase: true,
                                 ),
 
-                              // VOTING OVERLAY
+                              if (showSCChoose)
+                                PolicyOverlay(
+                                  game: g,
+                                  height: height,
+                                  width: width,
+                                  isHMPhase: false,
+                                ),
+
                               if (showVoting)
                                 VotingOverlay(
                                   game: g,
@@ -305,106 +272,54 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                   },
                                 ),
 
-                              // EXECUTIVE: INVESTIGATE
-                              if (g.phase == 'executive_investigate')
-                                ExecutiveInvestigateOverlay(
-                                  isHeadmaster: isHM,
-                                  height: height,
+                              Positioned.fill(
+                                child: _buildExecutiveStack(
+                                  g,
+                                  width,
+                                  height,
+                                  isHM,
+                                  isHost,
                                 ),
+                              ),
 
-                              if (g.phase == 'executive_investigate_result')
-                                ExecutiveInvestigateResultOverlay(
-                                  game: g,
-                                  isHeadmaster: isHM,
-                                  height: height,
-                                  onContinue: () => _firebase.endExecutive(widget.code),
-                                ),
-
-                              if (g.phase == 'executive_peek3')
-                                ExecutivePeek3Overlay(
-                                  game: g,
-                                  isHeadmaster: isHM,
-                                  height: height,
-                                  width: width,
-                                  onContinue: () => _firebase.endExecutive(widget.code),
-                                ),
-
-                              if (g.phase == 'executive_choose_hm')
-                                ExecutiveChooseHeadmasterOverlay(
-                                  isHeadmaster: isHM,
-                                  height: height,
-                                ),
-
-                              if (g.phase == 'executive_choose_hm_result')
-                                ExecutiveChooseHeadmasterResultOverlay(
-                                  game: g,
-                                  isHeadmaster: isHM,
-                                  height: height,
-                                  onConfirm: () =>
-                                      _firebase.confirmNextHeadmaster(widget.code),
-                                ),
-
-                              if (g.phase == 'executive_kill')
-                                ExecutiveKillOverlay(
-                                  isHeadmaster: isHM,
-                                  height: height,
-                                ),
-
-                              //EXECUTIVE KILL RESULT – host only actually resolves
-                              if (g.phase == 'executive_kill_result' ||
-                                  g.phase == 'executive_kill_result_arch')
-                                ExecutiveKillResultOverlay(
-                                  game: g,
-                                  height: height,
-                                  width: width,
-                                  isArch: g.phase == 'executive_kill_result_arch',
-                                  isHost: isHost,
-                                  onContinue: isHost
-                                      ? () async {
-                                          if (g.phase == 'executive_kill_result_arch') {
-                                            // GAME OVER
-                                            await FirebaseFirestore.instance
-                                                .collection('states')
-                                                .doc(widget.code)
-                                                .delete();
-                                            await _firebase.resetLobby(widget.code);
-                                          } else {
-                                            await _firebase.finalizeKill(widget.code);
-                                          }
-                                        }
-                                      : null,
-                                ),
-
-                              // Spectator hint (only if no blocking overlays)
-                              if (!showHMDiscard &&
-                                  !showSCChoose &&
-                                  !showVoting &&
-                                  g.phase != 'executive_investigate' &&
-                                  g.phase != 'executive_investigate_result' &&
-                                  g.phase != 'executive_peek3' &&
-                                  g.phase != 'executive_choose_hm' &&
-                                  g.phase != 'executive_kill' &&
-                                  g.phase != 'executive_kill_result' &&
-                                  g.phase != 'executive_kill_result_arch')
+                              if (showScroll)
                                 Align(
                                   alignment: Alignment.bottomCenter,
-                                  child: Padding(
-                                    padding: EdgeInsets.only(bottom: height * 0.05),
-                                    child: Text(
-                                      _spectatorHint(g),
-                                      style: TextStyle(
-                                        color: Colors.white54,
-                                        fontSize: height * 0.018,
-                                      ),
-                                    ),
+                                  child: RoleScrollOverlay(
+                                    game: g,
+                                    myUid: _uid!,
+                                    height: height,
+                                    width: width,
                                   ),
                                 ),
                             ],
                           );
-                        },
-
+                        }
                       },
                     ),
+
+
+                    // --- WIN SCREEN (TOP OF EVERYTHING) ---
+                    if (isGameOver)
+                      Positioned.fill(
+                        child: GameWinOverlay(
+                          game: _game,
+                          width: width,
+                          height: height,
+                          isHost: _uid == _creatorId,
+                          winnerTeam: winnerTeam!,
+                          onHostReturn: _uid == _creatorId
+                              ? () async {
+                                  await FirebaseFirestore.instance
+                                      .collection('states')
+                                      .doc(widget.code)
+                                      .delete();
+                                  await _firebase.resetLobby(widget.code);
+                                }
+                              : null,
+                        ),
+                      ),
+
                   ],
                 ),
               ),
@@ -415,79 +330,112 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
-  String _spectatorHint(WizardGameView g) {
-    switch (g.phase) {
-      case 'start':
-        return 'Headmaster: pick a Spellcaster by tapping a hat.';
-      case 'voting':
-        return 'Voting in progress…';
-      case 'hm_discard':
-        return 'Headmaster is discarding 1 card...';
-      case 'sc_choose':
-        return 'Spellcaster is choosing a card to enact...';
-      case 'executive_investigate':
-        return 'Headmaster is using Investigate Loyalty…';
-      case 'executive_investigate_result':
-        return 'Investigation complete – resolving…';
-      case 'executive_peek3':
-        return 'Headmaster is peeking at the next three spells…';
-      case 'executive_choose_hm':
-        return 'Headmaster is choosing the next Headmaster…';
-      case 'executive_kill':
-        return 'A lethal spell is about to be cast…';
-      case 'resolving':
-        return 'Resolving policy and rotating Headmaster...';
-      default:
-        return 'Waiting...';
-    }
+  Future<bool?> _confirmEndGame(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.black87,
+        title: const Text("End Game?",
+            style: TextStyle(color: Colors.white)),
+        content: const Text(
+          "Send everyone back to the lobby?",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Yes, return"),
+          ),
+        ],
+      ),
+    );
   }
 
-  String? _nextExecutiveWarning(WizardGameView g) {
-    final int playerCount = g.players.length;
-    final int curses = g.curses;
+  Widget _buildExecutiveStack(
+    WizardGameView g,
+    double width,
+    double height,
+    bool isHM,
+    bool isHost,
+  ) {
+    return Stack(
+      children: [
+        if (g.phase == 'executive_investigate')
+          ExecutiveInvestigateOverlay(
+            isHeadmaster: isHM,
+            height: height,
+          ),
 
-    // Never show warning DURING an executive power
-    if (g.executiveActive == true) return null;
+        if (g.phase == 'executive_investigate_result')
+          ExecutiveInvestigateResultOverlay(
+            game: g,
+            isHeadmaster: isHM,
+            height: height,
+            onContinue: () => _firebase.endExecutive(g.lobbyId),
+          ),
 
-    // 5–6 PLAYERS
-    if (playerCount >= 1 && playerCount <= 6) {
-      if (curses == 2) {
-        return "If the next Curse is enacted: Foresee three spells.";
-      }
-      if (curses == 3) {
-        return "If the next Curse is enacted: Execute a wizard.";
-      }
-    }
+        if (g.phase == 'executive_peek3')
+          ExecutivePeek3Overlay(
+            game: g,
+            isHeadmaster: isHM,
+            height: height,
+            width: width,
+            onContinue: () => _firebase.endExecutive(g.lobbyId),
+          ),
 
-    // 7–8 PLAYERS
-    if (playerCount >= 7 && playerCount <= 8) {
-      if (curses == 1) {
-        return "If the next Curse is enacted: Investigate Loyalty.";
-      }
-      if (curses == 2) {
-        return "If the next Curse is enacted: Foresee three spells.";
-      }
-      if (curses == 3) {
-        return "If the next Curse is enacted: Execute a wizard.";
-      }
-    }
+        if (g.phase == 'executive_choose_hm')
+          ExecutiveChooseHeadmasterOverlay(
+            isHeadmaster: isHM,
+            height: height,
+          ),
 
-    // 9–10 PLAYERS
-    if (playerCount >= 9 && playerCount <= 10) {
-      if (curses == 0) {
-        return "If the next Curse is enacted: Investigate Loyalty.";
-      }
-      if (curses == 1) {
-        return "If the next Curse is enacted: Investigate Loyalty.";
-      }
-      if (curses == 2) {
-        return "If the next Curse is enacted: Foresee three spells.";
-      }
-      if (curses == 3) {
-        return "If the next Curse is enacted: Execute a wizard.";
-      }
-    }
+        if (g.phase == 'executive_choose_hm_result')
+          ExecutiveChooseHeadmasterResultOverlay(
+            game: g,
+            isHeadmaster: isHM,
+            height: height,
+            onConfirm: () =>
+                _firebase.confirmNextHeadmaster(g.lobbyId),
+          ),
 
-    return null;
+        if (g.phase == 'executive_kill')
+          ExecutiveKillOverlay(
+            isHeadmaster: isHM,
+            height: height,
+          ),
+
+        if (g.phase == 'executive_kill_result' ||
+            g.phase == 'executive_kill_result_arch')
+          ExecutiveKillResultOverlay(
+            game: g,
+            height: height,
+            width: width,
+            isArch: g.phase == 'executive_kill_result_arch',
+            isHost: isHost,
+            onContinue: isHost
+                ? () async {
+                    // ⭐ IMPORTANT FIX ⭐
+                    if (g.phase == 'executive_kill_result_arch') {
+                      // ARCHWARLOCK DEATH = IMMEDIATE GAME OVER
+                      await _firebase.setGameOver(
+                        lobbyId: g.lobbyId,
+                        winningTeam: "order",
+                      );
+                      return; // <-- stops further processing
+                    }
+
+                    // Normal kill → continue game
+                    await _firebase.finalizeKill(g.lobbyId);
+                  }
+                : null,
+          ),
+      ],
+    );
   }
+
+
 }

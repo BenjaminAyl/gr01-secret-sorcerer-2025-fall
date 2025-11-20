@@ -39,3 +39,11 @@ flutter:
     - assets/audio/TavernMusic.wav
     - assets/audio/TavernLobbyMusic.wav
     - assets/audio/role_reveal.mp3
+    - assets/audio/backButton.wav
+    - assets/audio/card_pick_up.mp3
+    - assets/audio/charmCast.wav
+    - assets/audio/curseCast.wav
+    - assets/audio/enterButton.wav
+    - assets/audio/hostJoin.wav
+    - assets/audio/paperRoll.mp3
+    - assets/audio/TavernThemeMusic.wav

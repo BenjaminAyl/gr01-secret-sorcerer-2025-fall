@@ -15,6 +15,14 @@ class AudioHelper {
       'TavernLobbyMusic.wav',
       'TavernMusic.wav',
       'role_reveal.mp3',
+      'backButton.wav',
+      'card_pick_up.mp3',
+      'charmCast.wav',
+      'curseCast.wav',
+      'enterButton.wav',
+      'hostJoin.wav',
+      'paperRoll.mp3',
+      'TavernThemeMusic.wav',
     ]);
 
     _initialized = true;
@@ -91,5 +99,15 @@ class AudioHelper {
   //Stop all background music
   static Future<void> stop() async {
     await FlameAudio.bgm.stop();
+
   }
+
+  static Future<void> playSFX(String filename, {double volume = 1.0}) async {
+    await init();
+    FlameAudio.play(filename, volume: volume);
+  }
+
+
+
+
 }

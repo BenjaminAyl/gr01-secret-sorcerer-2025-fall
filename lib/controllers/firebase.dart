@@ -91,13 +91,23 @@ class FirebaseController {
     final stateRef = _firestore.collection('states').doc(lobbyId);
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
 
-    final players = _assignRoles(playerIds);
+    // 🔥 Shuffle the seating / hat order ONCE — synced for all players
+    final shuffled = List<String>.from(playerIds)..shuffle();
 
+    // Roles assigned based on the shuffled seating order
+    final players = _assignRoles(shuffled);
 
-    final state = GameState(players);
+    // 🔥 Randomize starting headmaster
+    final randomHM = Random().nextInt(players.length);
+
+    final state = GameState(players)
+      ..headmasterIdx = randomHM
+      ..headmaster = players[randomHM].username;
+
     await stateRef.set(state.toMap());
     await lobbyRef.update({'status': 'playing'});
   }
+
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchGame(String lobbyId) =>
       _firestore.collection('states').doc(lobbyId).snapshots();
@@ -397,24 +407,23 @@ class FirebaseController {
     });
   }
   String? _executivePowerFor(int players, int curses) {
-    // TEMPORARY: enable executive powers for small test games
-    if (players < 5) {
-      if (curses == 1) return "peek3";
-      if (curses == 2) return "choose_next_hm";
-      if (curses == 3) return "kill";// trigger EARLY for test
-      return null;
+    print("🔥 EXEC POWER CHECK → players=$players, curses=$curses");
+
+    //TESTING: enable executive powers for small test games
+    if (players < 5) { //not meant to play with under 5
+    return null;
     }
 
     //real game
     // 5–6 players
-    if (players <= 6) {
+    if (players == 5 || players == 6) {
       if (curses == 3) return "peek3";
       if (curses == 4) return "kill";
       if (curses == 5) return "kill"; 
     }
 
     // 7–8 players
-    if (players <= 8) {
+    if (players == 7 || players == 8) {
       if (curses == 2) return "investigate";
       if (curses == 3) return "choose_next_hm";
       if (curses == 4) return "kill";
@@ -422,7 +431,7 @@ class FirebaseController {
     }
 
     // 9–10 players
-    if (players <= 10) {
+    if (players == 9 || players == 10) {
       if (curses == 1) return "investigate";
       if (curses == 2) return "investigate";
       if (curses == 3) return "choose_next_hm";
@@ -588,19 +597,23 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
 
       // Apply enacted & discarded
       final enacted = pending.removeAt(enactIndex);
-      discard.add(pending.first); // the thrown card
+      discard.add(pending.first); // discarded card
 
+      // -----------------------------
+      // 1) INCREMENT CHARM OR CURSE
+      // -----------------------------
       if (enacted == 'charm') {
         charms += 1;
       } else {
         curses += 1;
 
-        // Check which executive power will trigger
+        // Check executive trigger for CURSE
         final power = _executivePowerFor(finalPlayersCount, curses);
         if (power != null) {
           execTriggered = true;
           execPowerToTrigger = power;
 
+          // Peek 3 needs top deck cards
           if (power == "peek3") {
             final List<String> deck =
                 List<String>.from((data['deck'] ?? []).cast<String>());
@@ -611,7 +624,58 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
         }
       }
 
-      // Baseline update (always lay the card!)
+      // ================================
+      // 2) WIN CONDITIONS (BOARD FILLED)
+      // ================================
+      if (charms >= 5) {
+        // GOOD TEAM WINS
+        tx.update(ref, {
+          'charms': charms,
+          'curses': curses,
+          'phase': 'game_over',
+          'winnerTeam': 'order',
+        });
+        return; // stop transaction here
+      }
+
+      if (curses >= 6) {
+        // EVIL TEAM WINS
+        tx.update(ref, {
+          'charms': charms,
+          'curses': curses,
+          'phase': 'game_over',
+          'winnerTeam': 'warlocks',
+        });
+        return;
+      }
+
+      // ===========================================================
+      // 3) WIN CONDITION: Electing Arch-Warlock after 3 curses laid
+      // ===========================================================
+      if (curses >= 3) {
+        final scUid = data['spellcasterNominee'];
+        if (scUid != null) {
+          final players = (data['players'] as List).cast<Map<String, dynamic>>();
+          final sc = players.firstWhere(
+            (p) => p['username'] == scUid,
+            orElse: () => {},
+          );
+
+          if (sc.isNotEmpty && sc['role'] == 'archwarlock') {
+            tx.update(ref, {
+              'charms': charms,
+              'curses': curses,
+              'phase': 'game_over',
+              'winnerTeam': 'warlocks',
+            });
+            return;
+          }
+        }
+      }
+
+      // -----------------------------
+      // 4) UPDATE BASELINE STATE
+      // -----------------------------
       tx.update(ref, {
         'charms': charms,
         'curses': curses,
@@ -621,7 +685,9 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
         if (!execTriggered) 'phase': 'resolving',
       });
 
-      // Now trigger the executive power (no early returns)
+      // -----------------------------
+      // 5) TRIGGER EXECUTIVE POWER
+      // -----------------------------
       if (!execTriggered) return;
 
       if (execPowerToTrigger == "investigate") {
@@ -654,12 +720,13 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
       }
     });
 
-    // Normal round (no executive) -> rotate HM
+    // ----------------------------------------------
+    // 6) NORMAL ROUND ENDS → Rotate Headmaster
+    // ----------------------------------------------
     if (!execTriggered) {
       await _rotateHeadmaster(lobbyId);
     }
   }
-
 
   //role assignment below
   List<GamePlayer> _assignRoles(List<String> ids) {
@@ -720,6 +787,28 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
   }
 
   return players;
+}
+
+Future<void> setGameOver({
+  required String lobbyId,
+  required String winningTeam, // "order" or "warlocks"
+}) async {
+  final ref = _firestore.collection('states').doc(lobbyId);
+
+  await ref.update({
+    'phase': 'game_over',
+    'winnerTeam': winningTeam,
+    'executivePower': null,
+    'executiveActive': false,
+    'executiveTarget': null,
+    'pendingExecutiveCards': [],
+    'pendingCards': [],
+    'pendingOwner': null,
+    'spellcasterNominee': null,
+    'spellcaster': null,
+    'votes': {},
+    'votePassed': FieldValue.delete(),
+  });
 }
 
 

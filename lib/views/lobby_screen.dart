@@ -160,7 +160,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   color: AppColors.customAccent,
                   size: AppSpacing.iconSizeLarge,
                 ),
-                onPressed: () => _leave(data),
+                onPressed: () async {
+                  AudioHelper.playSFX("back_button.wav");
+                  await Future.delayed(const Duration(milliseconds: 120)); // small delay
+                  _leave(data);
+                },
+
               ),
             ),
             body: SafeArea(

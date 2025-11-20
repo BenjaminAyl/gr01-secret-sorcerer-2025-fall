@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/views/game_view.dart';
 import 'package:secret_sorcerer/views/overlays/overlay_animations.dart';
+import 'package:secret_sorcerer/constants/app_text_styling.dart';
 
-/// EXECUTIVE: investigate selection overlay
 class ExecutiveInvestigateOverlay extends StatelessWidget {
   final bool isHeadmaster;
   final double height;
@@ -17,6 +17,7 @@ class ExecutiveInvestigateOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
+
         if (!isHeadmaster)
           Positioned.fill(
             child: Container(
@@ -25,15 +26,15 @@ class ExecutiveInvestigateOverlay extends StatelessWidget {
                 child: Text(
                   "Headmaster is investigating…",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: TextStyles.bodyLarge.copyWith(
                     color: Colors.white,
                     fontSize: height * 0.028,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ),
           ),
+
         if (isHeadmaster)
           Positioned(
             top: height * 0.18,
@@ -43,10 +44,9 @@ class ExecutiveInvestigateOverlay extends StatelessWidget {
               child: Text(
                 "Tap a wizard to investigate their loyalty",
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: TextStyles.body.copyWith(
                   color: Colors.white,
                   fontSize: height * 0.024,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
@@ -56,7 +56,6 @@ class ExecutiveInvestigateOverlay extends StatelessWidget {
   }
 }
 
-/// EXECUTIVE: investigate result overlay
 class ExecutiveInvestigateResultOverlay extends StatelessWidget {
   final WizardGameView game;
   final bool isHeadmaster;
@@ -75,6 +74,7 @@ class ExecutiveInvestigateResultOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
+
         if (!isHeadmaster)
           Positioned.fill(
             child: Container(
@@ -83,73 +83,84 @@ class ExecutiveInvestigateResultOverlay extends StatelessWidget {
                 child: Text(
                   "Headmaster is reviewing loyalty…",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: TextStyles.bodyLarge.copyWith(
                     color: Colors.white70,
                     fontSize: height * 0.026,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ),
           ),
+
         if (isHeadmaster)
           Center(
             child: Container(
-              padding: EdgeInsets.all(
-                height * 0.025,
-              ),
+              padding: EdgeInsets.all(height * 0.025),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.75),
+                color: Colors.black.withOpacity(0.80),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+
                   Text(
                     "Loyalty Revealed",
-                    style: TextStyle(
+                    style: TextStyles.heading.copyWith(
                       color: Colors.white,
                       fontSize: height * 0.030,
-                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   SizedBox(height: height * 0.02),
+
                   if (game.executiveTarget != null) ...[
                     Text(
                       "${game.nicknameCache[game.executiveTarget] ?? "Wizard"} is a:",
-                      style: TextStyle(
+                      style: TextStyles.body.copyWith(
                         color: Colors.white70,
                         fontSize: height * 0.022,
                       ),
                     ),
-                    Builder(
-                      builder: (_) {
-                        final target = game.players.firstWhere(
-                          (p) => p.username == game.executiveTarget!,
-                          orElse: () => game.players.first,
-                        );
-                        final loyalty =
-                            (target.role == 'wizard') ? 'WIZARD' : 'WARLOCK';
-                        final loyaltyColor =
-                            (loyalty == 'WARLOCK')
-                                ? Colors.redAccent
-                                : Colors.lightBlueAccent;
 
-                        return Text(
-                          loyalty,
-                          style: TextStyle(
-                            color: loyaltyColor,
-                            fontSize: height * 0.033,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        );
-                      },
-                    ),
+                    Builder(builder: (_) {
+                      final target = game.players.firstWhere(
+                        (p) => p.username == game.executiveTarget!,
+                        orElse: () => game.players.first,
+                      );
+
+                      final loyalty =
+                          (target.role == 'wizard') ? 'WIZARD' : 'WARLOCK';
+
+                      final loyaltyColor = (loyalty == 'WARLOCK')
+                          ? Colors.redAccent
+                          : Colors.lightBlueAccent;
+
+                      return Text(
+                        loyalty,
+                        style: TextStyles.heading.copyWith(
+                          color: loyaltyColor,
+                          fontSize: height * 0.034,
+                        ),
+                      );
+                    }),
                   ],
+
                   SizedBox(height: height * 0.035),
+
                   ElevatedButton(
                     onPressed: onContinue,
-                    child: const Text("Continue"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: Text(
+                      "Continue",
+                      style: TextStyles.bodySmall.copyWith(
+                        color: Colors.black,
+                        fontSize: height * 0.019,
+                      ),
+                    ),
+
                   ),
                 ],
               ),
@@ -160,7 +171,6 @@ class ExecutiveInvestigateResultOverlay extends StatelessWidget {
   }
 }
 
-/// EXECUTIVE: peek next 3 cards overlay
 class ExecutivePeek3Overlay extends StatelessWidget {
   final WizardGameView game;
   final bool isHeadmaster;
@@ -181,6 +191,7 @@ class ExecutivePeek3Overlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
+
         if (!isHeadmaster)
           Positioned.fill(
             child: Container(
@@ -189,15 +200,15 @@ class ExecutivePeek3Overlay extends StatelessWidget {
                 child: Text(
                   "Headmaster is foreseeing future spells…",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: TextStyles.bodyLarge.copyWith(
                     color: Colors.white70,
                     fontSize: height * 0.026,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ),
           ),
+
         if (isHeadmaster)
           AnimatedOpacity(
             opacity: 1,
@@ -205,20 +216,21 @@ class ExecutivePeek3Overlay extends StatelessWidget {
             child: Container(
               width: double.infinity,
               height: double.infinity,
-              color: Colors.black.withOpacity(0.65),
+              color: Colors.black.withOpacity(0.70),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+
                     Text(
                       "Next Three Spells",
-                      style: TextStyle(
+                      style: TextStyles.heading.copyWith(
                         color: Colors.white,
                         fontSize: height * 0.028,
-                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     SizedBox(height: height * 0.02),
+
                     SizedBox(
                       width: width * 0.9,
                       child: FittedBox(
@@ -243,12 +255,9 @@ class ExecutivePeek3Overlay extends StatelessWidget {
                                       horizontal: width * 0.015),
                                   padding: EdgeInsets.all(width * 0.02),
                                   decoration: BoxDecoration(
-                                    color:
-                                        Colors.white.withOpacity(0.10),
-                                    borderRadius:
-                                        BorderRadius.circular(12),
-                                    border: Border.all(
-                                        color: Colors.white24),
+                                    color: Colors.white.withOpacity(0.10),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.white24),
                                   ),
                                   child: Image.asset(
                                     asset,
@@ -263,27 +272,22 @@ class ExecutivePeek3Overlay extends StatelessWidget {
                         ),
                       ),
                     ),
+
                     SizedBox(height: height * 0.035),
                     ElevatedButton(
                       onPressed: onContinue,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: width * 0.08,
-                          vertical: height * 0.015,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                       ),
                       child: Text(
                         "Continue",
-                        style: TextStyle(
-                          fontSize: height * 0.022,
-                          fontWeight: FontWeight.w600,
+                        style: TextStyles.bodySmall.copyWith(
+                          color: Colors.black,
+                          fontSize: height * 0.020,
                         ),
                       ),
+
                     ),
                   ],
                 ),
@@ -308,7 +312,6 @@ class ExecutiveChooseHeadmasterOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!isHeadmaster) {
-      // Non-HM: full-screen dark lockout
       return Positioned.fill(
         child: Container(
           color: Colors.black.withOpacity(0.60),
@@ -316,10 +319,9 @@ class ExecutiveChooseHeadmasterOverlay extends StatelessWidget {
             child: Text(
               "Headmaster is choosing the next Headmaster…",
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: TextStyles.bodyLarge.copyWith(
                 color: Colors.white70,
                 fontSize: height * 0.026,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -327,9 +329,7 @@ class ExecutiveChooseHeadmasterOverlay extends StatelessWidget {
       );
     }
 
-    // Headmaster: non-blocking banner under the board
     return IgnorePointer(
-      // Let taps pass through to the hats
       ignoring: true,
       child: Align(
         alignment: Alignment.bottomCenter,
@@ -352,10 +352,9 @@ class ExecutiveChooseHeadmasterOverlay extends StatelessWidget {
               "Tap a wizard’s hat to appoint the next Headmaster.\n"
               "Turn order will continue from them.",
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: TextStyles.body.copyWith(
                 color: Colors.white,
-                fontSize: height * 0.02,
-                fontWeight: FontWeight.w600,
+                fontSize: height * 0.020,
               ),
             ),
           ),
@@ -386,10 +385,9 @@ class ExecutiveKillOverlay extends StatelessWidget {
             child: Text(
               "A lethal spell is being prepared…",
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: TextStyles.bodyLarge.copyWith(
                 color: Colors.redAccent.shade100,
                 fontSize: height * 0.026,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -397,7 +395,6 @@ class ExecutiveKillOverlay extends StatelessWidget {
       );
     }
 
-    // Headmaster: bottom banner, hats still tappable
     return IgnorePointer(
       ignoring: true,
       child: Align(
@@ -429,10 +426,9 @@ class ExecutiveKillOverlay extends StatelessWidget {
                 Text(
                   "Cast a lethal spell.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: TextStyles.heading.copyWith(
                     color: Colors.white,
                     fontSize: height * 0.022,
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 SizedBox(height: height * 0.006),
@@ -440,9 +436,9 @@ class ExecutiveKillOverlay extends StatelessWidget {
                   "Tap a wizard to eliminate them.\n"
                   "They will become a silent specter.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: TextStyles.bodySmall.copyWith(
                     color: Colors.white70,
-                    fontSize: height * 0.018,
+                    fontSize: height * 0.017,
                   ),
                 ),
               ],
@@ -454,8 +450,6 @@ class ExecutiveKillOverlay extends StatelessWidget {
   }
 }
 
-
-/// EXECUTIVE: choose next Headmaster RESULT overlay
 class ExecutiveChooseHeadmasterResultOverlay extends StatelessWidget {
   final WizardGameView game;
   final bool isHeadmaster;
@@ -473,8 +467,9 @@ class ExecutiveChooseHeadmasterResultOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final targetUid = game.executiveTarget;
-    final name =
-        targetUid != null ? (game.nicknameCache[targetUid] ?? 'Wizard') : 'Wizard';
+    final name = targetUid != null
+        ? (game.nicknameCache[targetUid] ?? 'Wizard')
+        : 'Wizard';
 
     return Stack(
       children: [
@@ -488,24 +483,27 @@ class ExecutiveChooseHeadmasterResultOverlay extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.85),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.amberAccent, width: 1.5),
+                        border: Border.all(
+                          color: Colors.amberAccent,
+                          width: 1.5,
+                        ),
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             "Next Headmaster Chosen",
-                            style: TextStyle(
+                            style: TextStyles.heading.copyWith(
                               color: Colors.white,
                               fontSize: height * 0.028,
-                              fontWeight: FontWeight.bold,
                             ),
                           ),
                           SizedBox(height: height * 0.02),
                           Text(
-                            "$name will become the next Headmaster.\nTurn order will continue from them.",
+                            "$name will become the next Headmaster.\n"
+                            "Turn order will continue from them.",
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: TextStyles.body.copyWith(
                               color: Colors.white70,
                               fontSize: height * 0.021,
                             ),
@@ -517,7 +515,12 @@ class ExecutiveChooseHeadmasterResultOverlay extends StatelessWidget {
                               backgroundColor: Colors.amberAccent,
                               foregroundColor: Colors.black,
                             ),
-                            child: const Text("Confirm"),
+                            child: Text(
+                              "Confirm",
+                              style: TextStyles.bodySmall.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -525,10 +528,9 @@ class ExecutiveChooseHeadmasterResultOverlay extends StatelessWidget {
                   : Text(
                       "Headmaster is appointing the next Headmaster…",
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: TextStyles.bodyLarge.copyWith(
                         color: Colors.white70,
                         fontSize: height * 0.026,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
             ),
@@ -571,11 +573,12 @@ class ExecutiveKillResultOverlay extends StatelessWidget {
     final body = isArch
         ? "$name was the ArchWarlock!\nThe wizards have won."
         : "$name has been struck down by a lethal spell.";
+
     final subtitle = isArch
         ? "The mortal realm is safe… for now."
         : "Their allegiance remains a mystery…";
 
-    final buttonText = isArch ? "Return to the mortal realm" : "Continue";
+    final buttonText = "Continue";
 
     return Container(
       width: double.infinity,
@@ -597,6 +600,7 @@ class ExecutiveKillResultOverlay extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+
                 TweenAnimationBuilder<double>(
                   tween: Tween(begin: 0.8, end: 1.0),
                   duration: const Duration(milliseconds: 500),
@@ -607,40 +611,48 @@ class ExecutiveKillResultOverlay extends StatelessWidget {
                   ),
                   child: Icon(
                     isArch ? Icons.bolt : Icons.flash_on,
-                    color: isArch ? Colors.amberAccent : Colors.redAccent,
+                    color:
+                        isArch ? Colors.amberAccent : Colors.redAccent,
                     size: height * 0.08,
                   ),
                 ),
+
                 SizedBox(height: height * 0.02),
+
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: TextStyles.heading.copyWith(
                     color: Colors.white,
                     fontSize: height * 0.032,
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 SizedBox(height: height * 0.015),
+
                 Text(
                   body,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: TextStyles.body.copyWith(
                     color: Colors.white70,
                     fontSize: height * 0.022,
                   ),
                 ),
+
                 SizedBox(height: height * 0.01),
+
                 Text(
                   subtitle,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: TextStyles.bodySmall.copyWith(
                     color: Colors.white60,
-                    fontSize: height * 0.018,
                     fontStyle: FontStyle.italic,
+                    fontSize: height * 0.018,
                   ),
                 ),
+
                 SizedBox(height: height * 0.035),
+
                 ElevatedButton(
                   onPressed: isHost ? onContinue : null,
                   style: ElevatedButton.styleFrom(
@@ -648,28 +660,30 @@ class ExecutiveKillResultOverlay extends StatelessWidget {
                         isArch ? Colors.greenAccent : Colors.deepOrangeAccent,
                     foregroundColor: Colors.black,
                     padding: EdgeInsets.symmetric(
-                      horizontal: width * 0.12,
+                      horizontal: width * 0.10,
                       vertical: height * 0.016,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(22),
                     ),
                   ),
                   child: Text(
                     buttonText,
-                    style: TextStyle(
+                    style: TextStyles.bodySmall.copyWith(
                       fontSize: height * 0.022,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                SizedBox(height: height * 0.02),
+
                 if (!isHost)
-                  Text(
-                    "Waiting…",
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: height * 0.018,
+                  Padding(
+                    padding: EdgeInsets.only(top: height * 0.02),
+                    child: Text(
+                      "Waiting…",
+                      style: TextStyles.bodySmall.copyWith(
+                        color: Colors.white60,
+                        fontSize: height * 0.018,
+                      ),
                     ),
                   ),
               ],
@@ -680,7 +694,6 @@ class ExecutiveKillResultOverlay extends StatelessWidget {
     );
   }
 }
-
 
 class ExecutiveKillAnimationOverlay extends StatelessWidget {
   final WizardGameView game;
@@ -706,9 +719,8 @@ class ExecutiveKillAnimationOverlay extends StatelessWidget {
             orElse: () => game.players.first,
           );
 
-    final targetName = targetUid == null
-        ? 'A wizard'
-        : (game.nicknameCache[targetUid] ?? 'A wizard');
+    final targetName =
+        targetUid == null ? 'A wizard' : (game.nicknameCache[targetUid] ?? 'A wizard');
 
     final isArch = target?.role == 'archwarlock';
 
@@ -723,32 +735,37 @@ class ExecutiveKillAnimationOverlay extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+
               Icon(
                 Icons.bolt,
                 color: Colors.redAccent.shade100,
                 size: height * 0.10,
               ),
+
               SizedBox(height: height * 0.02),
+
               Text(
                 "$targetName has been struck down!",
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: TextStyles.heading.copyWith(
                   color: Colors.white,
                   fontSize: height * 0.026,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
+
               SizedBox(height: height * 0.012),
+
               Text(
                 isArch
                     ? "Their true identity is revealed: the Archwarlock!"
                     : "Their role remains shrouded in mystery…",
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: TextStyles.body.copyWith(
                   color: Colors.white70,
-                  fontSize: height * 0.020,
+                  fontSize: height * 0.019,
                 ),
               ),
+
               if (isHeadmaster)
                 Padding(
                   padding: EdgeInsets.only(top: height * 0.03),
@@ -758,7 +775,10 @@ class ExecutiveKillAnimationOverlay extends StatelessWidget {
                       backgroundColor: Colors.white,
                       foregroundColor: Colors.black,
                     ),
-                    child: const Text("Continue"),
+                    child: Text(
+                      "Continue",
+                      style: TextStyles.bodySmall,
+                    ),
                   ),
                 ),
             ],

@@ -9,6 +9,7 @@ import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/models/game_player.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
 
 class WizardGameView extends FlameGame with TapCallbacks {
   final String lobbyId;
@@ -105,15 +106,25 @@ class WizardGameView extends FlameGame with TapCallbacks {
     FirebaseFirestore.instance
         .collection('states')
         .doc(lobbyId)
-        .snapshots()
-        .listen((snap) async {
-      if (!snap.exists) return;
-      final data = snap.data() ?? {};
-      await _syncFromData(data);
-    });
+        .snapshots().listen((snap) async {
+        if (!snap.exists) return;
+        final data = snap.data() ?? {};
+
+        await _syncFromData(data);
+        Future.microtask(() {
+          if (overlays.isActive('ControlsOverlay')) {
+            overlays.remove('ControlsOverlay');
+            overlays.add('ControlsOverlay');
+          }
+        });
+      });
+
   }
 
   Future<void> _syncFromData(Map<String, dynamic> data) async {
+
+    
+
     final rawPlayers = (data['players'] as List?) ?? [];
     players = rawPlayers
         .map(
@@ -244,15 +255,27 @@ class WizardGameView extends FlameGame with TapCallbacks {
     final circleR = boardR * outerFactor;
 
     const start = -pi / 2;
+
+    const double topOffset = 10.0; // extra spacing for top hats
+
     for (int i = 0; i < n; i++) {
       final angle = start + (2 * pi * i) / n;
       final dir = Vector2(cos(angle), sin(angle));
       final hat = hats[i];
+
+      // outward nudge based on hat size
       final outwardNudge = (hat.size.y * 0.33) + 6;
-      final pos = center + dir * (circleR + outwardNudge);
-      hat.position = pos;
+
+      // only apply extra spacing to hats ABOVE the board (sin(angle) > 0 => below, < 0 => above)
+      double extra = 0;
+      if (dir.y < 0) {
+        extra = topOffset; 
+      }
+
+      hat.position = center + dir * (circleR + outwardNudge + extra);
     }
   }
+
 
   void _placeHats() {
     for (final h in hats) {
@@ -465,6 +488,8 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
     if (charms > 0) {
       if (charms != _prevCharmLevel) {
+        AudioHelper.playSFX("charmCast.wav");
+
         charmsRing?.removeFromParent();
         final charmSprite =
             await loadSprite('game-assets/board/charm${charms.clamp(1, 5)}.png');
@@ -489,6 +514,9 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
     if (curses > 0) {
       if (curses != _prevCurseLevel) {
+        
+        AudioHelper.playSFX("curseCast.wav");
+
         cursesRing?.removeFromParent();
         final curseSprite =
             await loadSprite('game-assets/board/curse${curses.clamp(1, 6)}.png');
@@ -544,7 +572,7 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   PlayerHatComponent(this.index, this.nickname, this.onTap)
       : super(size: Vector2.all(45), anchor: Anchor.center);
 
-  static const double _labelGap = 2;
+  static const double _labelGap = 0.5;
 
   @override
   Future<void> onLoad() async {

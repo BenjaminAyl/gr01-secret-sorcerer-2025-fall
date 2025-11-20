@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/main.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -64,6 +65,7 @@ class _SignupScreenState extends State<SignupScreen> {
             AppSpacing.gapL,
             ElevatedButton(
               onPressed: () async {
+                AudioHelper.playSFX("enterButton.wav");
                 final username = _usernameController.text.trim().toLowerCase();
                 final email = _emailController.text.trim();
                 final password = _passwordController.text;
@@ -117,9 +119,13 @@ class _SignupScreenState extends State<SignupScreen> {
               children: [
                 const Text("Already have an account?", style: TextStyles.body),
                 TextButton(
-                  onPressed: () => context.go('/'),
+                  onPressed: () {
+                    AudioHelper.playSFX("enter_button.wav"); 
+                    context.go('/');                           
+                  },
                   child: const Text('Login'),
-                ),
+                )
+
               ],
             ),
           ],
