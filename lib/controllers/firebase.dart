@@ -383,20 +383,25 @@ class FirebaseController {
     });
   }
   String? _executivePowerFor(int players, int curses) {
-    if (players <= 6) {
-      switch (curses) {
-        case 2: return "investigate";
-      }
+    // 5–6 players: peek top 3 at 3 curses
+    if (players >= 1 && players <= 6) {
+      if (curses == 3) return "peek3";
     }
 
-    if (players <= 8) {
-      switch (curses) {
-        case 3: return "investigate";
-      }
+    // 7–8 players: investigate at 2 
+    if (players >= 7 && players <= 8) {
+      if (curses == 2) return "investigate";
+    }
+
+    // 9–10 players: investigate at 1 and 2 
+    if (players >= 9 && players <= 10) {
+      if (curses == 1 || curses == 2) return "investigate";
     }
 
     return null;
   }
+
+
   Future<void> investigateSelectTarget(String lobbyId, String targetUid) async {
   final ref = _firestore.collection('states').doc(lobbyId);
 
@@ -423,13 +428,12 @@ class FirebaseController {
 
 
 
-/// SC chooses one to cast
   Future<void> spellcasterChoose(String lobbyId, int enactIndex) async {
     final ref = _firestore.collection('states').doc(lobbyId);
 
-    bool execTriggered = false;  // <- track if we hit an executive power
-
-    int finalCurses = 0; // values after transaction
+    bool execTriggered = false;
+    String? execPowerToTrigger;  
+    List<String> peekCards = [];    
     int finalPlayersCount = 0;
 
     await _firestore.runTransaction((tx) async {
@@ -442,44 +446,40 @@ class FirebaseController {
 
       if (phase != 'sc_choose' || owner != 'spellcaster') return;
 
-      List<String> pending = List<String>.from(
-          (data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
-
-      List<String> discard = List<String>.from(
-          (data['discard'] as List?)?.map((e) => e.toString()) ?? []);
-
-      int charms = (data['charms'] ?? 0) as int;
-      int curses = (data['curses'] ?? 0) as int;
+      List<String> pending = List<String>.from((data['pendingCards'] ?? []).cast<String>());
+      List<String> discard = List<String>.from((data['discard'] ?? []).cast<String>());
+      int charms = data['charms'] ?? 0;
+      int curses = data['curses'] ?? 0;
       finalPlayersCount = (data['players'] as List).length;
 
       if (pending.length != 2 || enactIndex < 0 || enactIndex > 1) return;
 
-      final enacted = pending.removeAt(enactIndex); 
-      final thrown = pending.first;
-      discard.add(thrown);
-
-      // ---- APPLY POLICY ----
+      // Apply enacted & discarded
+      final enacted = pending.removeAt(enactIndex);
+      discard.add(pending.first); // the thrown card
       if (enacted == 'charm') {
         charms += 1;
       } else {
         curses += 1;
 
-        // EXECUTIVE POWER CHECK
+        // Check which executive power will trigger
         final power = _executivePowerFor(finalPlayersCount, curses);
 
         if (power != null) {
           execTriggered = true;
-          tx.update(ref, {
-            'executivePower': power,
-            'executiveActive': true,
-            'phase': 'executive_$power',
-          });
+          execPowerToTrigger = power;
+
+          // Prepare peek3 cards BEFORE writing anything
+          if (power == "peek3") {
+            final List<String> deck = List<String>.from(data['deck'] ?? []);
+            if (deck.length >= 3) {
+              peekCards = List<String>.from(deck.sublist(0, 3));
+            }
+          }
         }
       }
 
-      finalCurses = curses;
-
-      // baseline update
+      //update state baseline
       tx.update(ref, {
         'charms': charms,
         'curses': curses,
@@ -488,49 +488,67 @@ class FirebaseController {
         'pendingOwner': null,
         if (!execTriggered) 'phase': 'resolving',
       });
+
+      //power activation
+      if (execTriggered && execPowerToTrigger == "investigate") {
+        tx.update(ref, {
+          'executivePower': 'investigate',
+          'executiveActive': true,
+          'phase': 'executive_investigate',
+        });
+      }
+
+      if (execTriggered && execPowerToTrigger == "peek3") {
+        tx.update(ref, {
+          'executivePower': 'peek3',
+          'executiveActive': true,
+          'phase': 'executive_peek3',
+          'pendingExecutiveCards': peekCards,
+        });
+      }
     });
 
-    // OUTSIDE TRANSACTION:
-    // Only rotate HM if NO executive power was invoked
+    //power activation
     if (!execTriggered) {
-      await _rotateHeadmaster(lobbyId);
+      await _rotateHeadmaster(lobbyId); // normal round
     }
+    //rotation at end
   }
 
 
   //role assignment below
   List<GamePlayer> _assignRoles(List<String> ids) {
-  final n = ids.length;
-  final rng = Random();
+    final n = ids.length;
+    final rng = Random();
 
-  // Shuffle for randomness
-  final shuffled = List<String>.from(ids)..shuffle();
+    // Shuffle for randomness
+    final shuffled = List<String>.from(ids)..shuffle();
 
-  late int numWarlocks;   // includes ArchWarlock inside
-  late bool archSeesWarlocks;  
+    late int numWarlocks;   // includes ArchWarlock inside
+    late bool archSeesWarlocks;  
 
-  // Player count rules — themed version of Secret Hitler rules
-  if (n == 5) {
-    numWarlocks = 2;       // 1 ArchWarlock + 1 Warlock
-    archSeesWarlocks = false;
-  } else if (n == 6) {
-    numWarlocks = 2;       // 1 ArchWarlock + 1 Warlock
-    archSeesWarlocks = true;
-  } else if (n == 7) {
-    numWarlocks = 3;       // 1 ArchWarlock + 2 Warlocks
-    archSeesWarlocks = false;
-  } else if (n == 8) {
-    numWarlocks = 3;       // 1 ArchWarlock + 2 Warlocks
-    archSeesWarlocks = true;
-  } else if (n == 9){
-    numWarlocks = 4;       // 1 ArchWarlock + 3 Warlocks
-    archSeesWarlocks = false;
-  } else if (n == 10){
-    numWarlocks = 4;       // 1 ArchWarlock + 3 Warlocks
-    archSeesWarlocks = true;
-  } else {
-    numWarlocks = 1;       // failsafe (just ArchWarlock)
-    archSeesWarlocks = false;
+    // Player count rules — themed version of Secret Hitler rules
+    if (n == 5) {
+      numWarlocks = 2;       // 1 ArchWarlock + 1 Warlock
+      archSeesWarlocks = false;
+    } else if (n == 6) {
+      numWarlocks = 2;       // 1 ArchWarlock + 1 Warlock
+      archSeesWarlocks = true;
+    } else if (n == 7) {
+      numWarlocks = 3;       // 1 ArchWarlock + 2 Warlocks
+      archSeesWarlocks = false;
+    } else if (n == 8) {
+      numWarlocks = 3;       // 1 ArchWarlock + 2 Warlocks
+      archSeesWarlocks = true;
+    } else if (n == 9){
+      numWarlocks = 4;       // 1 ArchWarlock + 3 Warlocks
+      archSeesWarlocks = false;
+    } else if (n == 10){
+      numWarlocks = 4;       // 1 ArchWarlock + 3 Warlocks
+      archSeesWarlocks = true;
+    } else {
+      numWarlocks = 1;       // failsafe (just ArchWarlock)
+      archSeesWarlocks = false;
   }
   final arch = shuffled.first;
   final warlocks = shuffled.sublist(1, numWarlocks);

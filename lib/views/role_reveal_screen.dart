@@ -213,10 +213,11 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
                         return Padding(
                           padding: EdgeInsets.symmetric(horizontal: w * 0.07),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               SizedBox(height: h * 0.14),
 
-                              //TITLE
+                              // TITLE
                               AnimatedBuilder(
                                 animation: titleCtrl,
                                 builder: (_, __) {
@@ -225,21 +226,23 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
 
                                   return Transform.translate(
                                     offset: Offset(0, slide),
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        title,
-                                        style: TextStyle(
-                                          letterSpacing: 5,
-                                          fontSize: w * 0.17,
-                                          fontWeight: FontWeight.w900,
-                                          color: accent,
-                                          shadows: [
-                                            Shadow(
-                                              color: accent.withOpacity(0.6),
-                                              blurRadius: glow,
-                                            )
-                                          ],
+                                    child: Center(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          title,
+                                          style: TextStyle(
+                                            letterSpacing: 5,
+                                            fontSize: w * 0.17,
+                                            fontWeight: FontWeight.w900,
+                                            color: accent,
+                                            shadows: [
+                                              Shadow(
+                                                color: accent.withOpacity(0.6),
+                                                blurRadius: glow,
+                                              )
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -249,20 +252,22 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
 
                               SizedBox(height: h * 0.03),
 
-                              //SUBTITLE
+                              // SUBTITLE
                               AnimatedBuilder(
                                 animation: subtitleCtrl,
                                 builder: (_, __) {
                                   return Opacity(
                                     opacity: subtitleCtrl.value,
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        subtitle,
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: w * 0.045,
-                                          color: Colors.white70,
+                                    child: Center(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          subtitle,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: w * 0.045,
+                                            color: Colors.white70,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -272,17 +277,19 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
 
                               SizedBox(height: h * 0.04),
 
-                              //Partners
+                              // PARTNERS
                               AnimatedBuilder(
                                 animation: partnersCtrl,
                                 builder: (_, __) {
                                   return Opacity(
                                     opacity: partnersCtrl.value,
-                                    child: buildPartners(
-                                      role,
-                                      partnerNames,
-                                      accent,
-                                      w,
+                                    child: Center(
+                                      child: buildPartners(
+                                        role,
+                                        partnerNames,
+                                        accent,
+                                        w,
+                                      ),
                                     ),
                                   );
                                 },
@@ -290,38 +297,40 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
 
                               const Spacer(),
 
-                              //Button
+                              // BUTTON
                               AnimatedBuilder(
                                 animation: buttonCtrl,
                                 builder: (_, __) {
                                   return Opacity(
                                     opacity: buttonCtrl.value,
-                                    child: ScaleTransition(
-                                      scale: CurvedAnimation(
-                                        parent: buttonCtrl,
-                                        curve: Curves.easeOutBack,
-                                      ),
-                                      child: SizedBox(
-                                        width: w * 0.55,
-                                        height: h * 0.065,
-                                        child: ElevatedButton(
-                                          onPressed: () {
-                                            AudioHelper.crossfade('TavernMusic.wav');
-                                            context.go('/game/${widget.code}');
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: accent,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(14),
+                                    child: Center(
+                                      child: ScaleTransition(
+                                        scale: CurvedAnimation(
+                                          parent: buttonCtrl,
+                                          curve: Curves.easeOutBack,
+                                        ),
+                                        child: SizedBox(
+                                          width: w * 0.55,
+                                          height: h * 0.065,
+                                          child: ElevatedButton(
+                                            onPressed: () {
+                                              AudioHelper.crossfade('TavernMusic.wav');
+                                              context.go('/game/${widget.code}');
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: accent,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(14),
+                                              ),
                                             ),
-                                          ),
-                                          child: FittedBox(
-                                            child: Text(
-                                              "BEGIN",
-                                              style: TextStyle(
-                                                color: Colors.black,
-                                                fontSize: w * 0.06,
-                                                fontWeight: FontWeight.bold,
+                                            child: FittedBox(
+                                              child: Text(
+                                                "BEGIN",
+                                                style: TextStyle(
+                                                  color: Colors.black,
+                                                  fontSize: w * 0.06,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -336,6 +345,7 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
                             ],
                           ),
                         );
+
                       },
                     ),
                   );

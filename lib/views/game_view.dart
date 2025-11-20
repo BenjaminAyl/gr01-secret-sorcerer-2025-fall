@@ -394,7 +394,7 @@ Future<void> _onHatTapped(int index) async {
       if (curses != _prevCurseLevel) {
         cursesRing?.removeFromParent();
         final curseSprite =
-            await loadSprite('game-assets/board/curse${curses.clamp(1, 3)}.png');
+            await loadSprite('game-assets/board/curse${curses.clamp(1, 6)}.png');
 
         cursesRing = SpriteComponent(
           sprite: curseSprite,
