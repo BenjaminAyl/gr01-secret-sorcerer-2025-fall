@@ -6,6 +6,7 @@ import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
+import 'package:secret_sorcerer/widgets/dialogs/rules_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -88,7 +89,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     Column(
                       children: [
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () => showDialog(
+                            context: context,
+                            barrierDismissible: true,
+                            builder: (_) => const RulesDialog(),
+                          ),
                           child: Image.asset(
                             'assets/images/tome.png',
                             width: 70,
@@ -100,6 +105,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     AppSpacing.gapWL,
+                    Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () => context.go('/leaderboard'),
+                          child: Image.asset(
+                            'assets/images/trophy.png',
+                            width: 70,
+                            height: 70,
+                          ),
+                        ),
+                        AppSpacing.gapXS,
+                        const Text('Leaderboard', style: TextStyles.body),
+                      ],
+                    ),
                     AppSpacing.gapWL,
                     Column(
                       children: [
@@ -119,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              AppSpacing.gapXL
+              AppSpacing.gapXL,
             ],
           ),
         ),

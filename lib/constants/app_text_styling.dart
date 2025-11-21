@@ -57,4 +57,42 @@ class TextStyles {
     color: AppColors.primaryBrand,
     letterSpacing: 0.5,
   );
+
+  // Styles for Rule/Credits book
+  static final TextStyle bookTitle = GoogleFonts.quintessential(
+    textStyle: const TextStyle(
+      fontSize: 30,
+      fontWeight: FontWeight.w600,
+      color: AppColors.primaryBrand,
+      letterSpacing: 0.4,
+    ),
+  );
+
+  static final TextStyle bookSectionHeading = GoogleFonts.quintessential(
+    textStyle: const TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w700,
+      color: AppColors.primaryBrand,
+      letterSpacing: 0.6,
+    ),
+  );
+
+  static final TextStyle bookBody = GoogleFonts.quintessential(
+    textStyle: const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w500,
+      color: AppColors.primaryBrand,
+      height: 1.4,
+    ),
+  );
+
+  static final TextStyle bookBodySmall = GoogleFonts.quintessential(
+    textStyle: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      color: AppColors.primaryBrand,
+      height: 1.4,
+      letterSpacing: 0.2,
+    ),
+  );
 }

@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
 
 CollectionReference usersDB = FirebaseFirestore.instance.collection("users");
@@ -9,8 +8,6 @@ CollectionReference usersDB = FirebaseFirestore.instance.collection("users");
 final firebaseController = FirebaseController();
 
 class UserAuth {
-  static const _sessionBox = 'session';
-  static const _userKey = 'user';
 
   /// Safely decodes a Firestore [DocumentSnapshot] into a [Map] of data.
   ///
@@ -21,22 +18,22 @@ class UserAuth {
     return (snap.data() as Map<String, dynamic>?) ?? {};
   }
 
-  /// Opens or returns the Hive box used for storing user session data.
-  ///
-  /// Returns a [Box] that contains session info.
-  Future<Box> _openSessionBox() async {
-    if (!Hive.isBoxOpen(_sessionBox)) {
-      await Hive.openBox(_sessionBox);
-    }
-    return Hive.box(_sessionBox);
-  }
-
-  // Returns information about the current user
+  // Returns information about the current user from FirebaseAuth + Firestore.
+  // If no user is signed in, returns null.
   Future<AppUser?> getCurrentUser() async {
-    final box = await Hive.openBox(_sessionBox);
-    final data = box.get(_userKey);
-    if (data == null) return null;
-    return AppUser.fromMap(Map<String, dynamic>.from(data));
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+
+    // Load profile from Firestore and normalize field names for AppUser.
+    final snap = await usersDB.doc(user.uid).get();
+    final data = decodeSnapshot(snap);
+
+    return AppUser.fromMap({
+      'uid': user.uid,
+      'email': user.email ?? data['Email'] ?? data['email'] ?? '',
+      'username': (data['Username'] ?? data['username'] ?? '').toString().toLowerCase(),
+      'nickname': data['Nickname'] ?? data['nickname'] ?? '',
+    });
   }
 
   /// Returns true if [username] (case-insensitive) is not taken.
@@ -78,6 +75,8 @@ class UserAuth {
       "Username": usernameLower,
       "Email": credential.user!.email,
       "Nickname": nickname,
+      "wins": 0,
+      "losses": 0,
     });
 
     return uid;
@@ -93,22 +92,8 @@ class UserAuth {
     required String email,
     required String password,
   }) async {
+    // Authenticate with Firebase Auth. Session state is managed by Firebase.
     final userCredit = await firebaseController.signIn(email, password);
-
-    // Load profile from Firestore.
-    final currentUid = userCredit.user!.uid;
-    final snap = await usersDB.doc(currentUid).get();
-    final userData = decodeSnapshot(snap);
-
-    // Save minimal session data locally.
-    final box = await _openSessionBox();
-    await box.put(_userKey, {
-      'uid': currentUid,
-      'email': userCredit.user!.email,
-      'username': userData['Username'],
-      'nickname': userData['Nickname'],
-    });
-
     return userCredit;
   }
 
@@ -116,10 +101,6 @@ class UserAuth {
   Future<void> signOut() async {
   // Sign out from Firebase Auth
   await FirebaseAuth.instance.signOut();
-
-  // Clear local session data
-  final box = await Hive.openBox('sessionBox');
-  await box.delete('user');
 }
 
   /// Updates the user's username in Firestore.

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secret_sorcerer/models/game_player.dart';
 import 'package:secret_sorcerer/models/game_state.dart';
 import 'dart:math';
+import 'package:secret_sorcerer/models/user_model.dart';
 
 class FirebaseController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -25,6 +26,19 @@ class FirebaseController {
   User? get currentUser => FirebaseAuth.instance.currentUser;
 
   //Lobby MANAGEMENT
+  Future<List<Map<String, dynamic>>> loadAllUsers() async {
+    final snapshot = await _firestore.collection('users')
+      .orderBy( 'wins', descending: true )
+      .get();
+    // Map each document to a User instance
+    return snapshot.docs.map((doc) {
+      final data = doc.data();      // Map<String, dynamic>
+      data['id'] = doc.id;          // optionally include the document ID
+      return data;
+    }).toList();
+  }
+
+  //lobby management
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchLobby(String lobbyId) =>
       _firestore.collection('lobbies').doc(lobbyId).snapshots();
 
