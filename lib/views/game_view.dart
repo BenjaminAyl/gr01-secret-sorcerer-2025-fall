@@ -112,11 +112,14 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
         await _syncFromData(data);
         Future.microtask(() {
+          if (phase == 'game_over') return;
+
           if (overlays.isActive('ControlsOverlay')) {
             overlays.remove('ControlsOverlay');
             overlays.add('ControlsOverlay');
           }
         });
+
       });
 
   }

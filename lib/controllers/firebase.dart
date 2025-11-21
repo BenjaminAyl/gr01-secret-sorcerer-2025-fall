@@ -90,14 +90,8 @@ class FirebaseController {
   Future<void> startGame(String lobbyId, List<String> playerIds) async {
     final stateRef = _firestore.collection('states').doc(lobbyId);
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
-
-    // 🔥 Shuffle the seating / hat order ONCE — synced for all players
     final shuffled = List<String>.from(playerIds)..shuffle();
-
-    // Roles assigned based on the shuffled seating order
     final players = _assignRoles(shuffled);
-
-    // 🔥 Randomize starting headmaster
     final randomHM = Random().nextInt(players.length);
 
     final state = GameState(players)
@@ -407,10 +401,10 @@ class FirebaseController {
     });
   }
   String? _executivePowerFor(int players, int curses) {
-    print("🔥 EXEC POWER CHECK → players=$players, curses=$curses");
 
     //TESTING: enable executive powers for small test games
-    if (players < 5) { //not meant to play with under 5
+    if (players < 5) { 
+    if (curses == 1) return 'kill'; //not meant to play with under 5
     return null;
     }
 
@@ -595,25 +589,19 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
 
       if (pending.length != 2 || enactIndex < 0 || enactIndex > 1) return;
 
-      // Apply enacted & discarded
       final enacted = pending.removeAt(enactIndex);
-      discard.add(pending.first); // discarded card
+      discard.add(pending.first);
 
-      // -----------------------------
-      // 1) INCREMENT CHARM OR CURSE
-      // -----------------------------
       if (enacted == 'charm') {
         charms += 1;
       } else {
         curses += 1;
 
-        // Check executive trigger for CURSE
         final power = _executivePowerFor(finalPlayersCount, curses);
         if (power != null) {
           execTriggered = true;
           execPowerToTrigger = power;
 
-          // Peek 3 needs top deck cards
           if (power == "peek3") {
             final List<String> deck =
                 List<String>.from((data['deck'] ?? []).cast<String>());
@@ -624,22 +612,17 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
         }
       }
 
-      // ================================
-      // 2) WIN CONDITIONS (BOARD FILLED)
-      // ================================
       if (charms >= 5) {
-        // GOOD TEAM WINS
         tx.update(ref, {
           'charms': charms,
           'curses': curses,
           'phase': 'game_over',
           'winnerTeam': 'order',
         });
-        return; // stop transaction here
+        return;
       }
 
       if (curses >= 6) {
-        // EVIL TEAM WINS
         tx.update(ref, {
           'charms': charms,
           'curses': curses,
@@ -649,13 +632,11 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
         return;
       }
 
-      // ===========================================================
-      // 3) WIN CONDITION: Electing Arch-Warlock after 3 curses laid
-      // ===========================================================
       if (curses >= 3) {
-        final scUid = data['spellcasterNominee'];
+        final scUid = data['spellcaster'];
         if (scUid != null) {
-          final players = (data['players'] as List).cast<Map<String, dynamic>>();
+          final players =
+              (data['players'] as List).cast<Map<String, dynamic>>();
           final sc = players.firstWhere(
             (p) => p['username'] == scUid,
             orElse: () => {},
@@ -673,9 +654,6 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
         }
       }
 
-      // -----------------------------
-      // 4) UPDATE BASELINE STATE
-      // -----------------------------
       tx.update(ref, {
         'charms': charms,
         'curses': curses,
@@ -685,9 +663,6 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
         if (!execTriggered) 'phase': 'resolving',
       });
 
-      // -----------------------------
-      // 5) TRIGGER EXECUTIVE POWER
-      // -----------------------------
       if (!execTriggered) return;
 
       if (execPowerToTrigger == "investigate") {
@@ -720,12 +695,16 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
       }
     });
 
-    // ----------------------------------------------
-    // 6) NORMAL ROUND ENDS → Rotate Headmaster
-    // ----------------------------------------------
-    if (!execTriggered) {
-      await _rotateHeadmaster(lobbyId);
-    }
+    final snapshot = await _firestore.collection('states').doc(lobbyId).get();
+    final endingData = snapshot.data();
+    if (endingData == null) return;
+
+    final phaseAfter = endingData['phase'];
+    if (phaseAfter == 'game_over') return;
+
+    if (execTriggered) return;
+
+    await _rotateHeadmaster(lobbyId);
   }
 
   //role assignment below

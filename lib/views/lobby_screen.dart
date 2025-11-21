@@ -144,7 +144,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
 
           // UI data
-          final hostName = nicknames[creatorId] ?? 'Host';
+          final hostName = '${nicknames[creatorId] ?? 'Host'} (Host)';
+
           final otherPlayers = ids.where((id) => id != creatorId).toList();
 
           return Scaffold(
@@ -209,7 +210,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'HOST:',
+                        '',
                         style: TextStyles.bodyLarge.copyWith(
                           color: AppColors.textAccent,
                           fontWeight: FontWeight.bold,
