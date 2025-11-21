@@ -7,6 +7,7 @@ import 'package:secret_sorcerer/models/user_model.dart';
 import 'package:secret_sorcerer/widgets/friends/friends_switch.dart';
 import 'package:secret_sorcerer/widgets/friends/friends_list.dart';
 import 'package:secret_sorcerer/widgets/friends/friend_requests_list.dart';
+import 'package:secret_sorcerer/controllers/friends_controller.dart';
 import 'package:secret_sorcerer/widgets/buttons/pill_button.dart';
 
 class ManageFriendsScreen extends StatefulWidget {
@@ -21,25 +22,23 @@ enum FriendTab { friends, requests }
 class _ManageFriendsScreenState extends State<ManageFriendsScreen> {
   final _usernameCtrl = TextEditingController();
   FriendTab _currentTab = FriendTab.friends;
+  final FriendsController _controller = FriendsController();
 
-  // Mock data — TODO: replace with actual lists of friends and friend requests
-final List<AppUser> _friends = [
-  AppUser(uid: '1', username: 'marco', nickname: 'Marco', email: 'marco@example.com'),
-  AppUser(uid: '2',username: 'ben', nickname: 'Ben', email: 'ben@example.com'),
-  AppUser(uid: '3',username: 'bella', nickname: 'Bella', email: 'bella@example.com'),
-  AppUser(uid: '4',username: 'liam', nickname: 'Liam', email: 'liam@example.com'),
-  AppUser(uid: '5',username: 'pranjal', nickname: 'Pranjal', email: 'pranjal@example.com'),
-];
-
-final List<AppUser> _requests = [
-  AppUser(uid: '6',username: 'ava', nickname: 'Ava', email: 'ava@example.com'),
-  AppUser(uid: '7',username: 'ethan', nickname: 'Ethan', email: 'ethan@example.com'),
-];
+  // Streams for friends and incoming requests
+  Stream<List<AppUser>>? _friendsStream;
+  Stream<List<AppUser>>? _requestsStream;
 
   @override
   void dispose() {
     _usernameCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _friendsStream = _controller.watchFriends();
+    _requestsStream = _controller.watchIncomingRequests();
   }
 
   @override
@@ -93,10 +92,19 @@ final List<AppUser> _requests = [
                   width: AppSpacing.cardWidthNarrow,
                   child: PillButton.small(
                     label: 'Send Friend Request',
-                    onPressed: () {
-                      // TODO: send friend request _usernameCtrl
-                      
-                      // TODO: on successfully sent freiend request show "sent" message, maybe make a noise?
+                    onPressed: () async {
+                      final username = _usernameCtrl.text.trim();
+                      try {
+                        await _controller.sendFriendRequestToUsername(username);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Friend request sent')),
+                        );
+                        _usernameCtrl.clear();
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(e.toString())),
+                        );
+                      }
                     },
                   ),
                 ),
@@ -118,20 +126,74 @@ final List<AppUser> _requests = [
 
               // --- Content area that switches ---
               if (_currentTab == FriendTab.friends)
-                FriendsList(
-                  friends: _friends,
-                  onRemove: (AppUser friend) {
-                    // TODO: remove friend
+                // Friends stream
+                StreamBuilder<List<AppUser>>(
+                  stream: _friendsStream,
+                  builder: (context, snapshot) {
+                    final friends = snapshot.data ?? [];
+                    return FriendsList(
+                      friends: friends,
+                      onRemove: (AppUser friend) async {
+                        try {
+                          await _controller.removeFriend(friend.uid);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Friend removed')),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
+                      },
+                    );
                   },
                 )
               else
-                FriendRequestsList(
-                  requests: _requests,
-                  onAccept: (AppUser friendRequest) {
-                    // TODO: accept request
-                  },
-                  onDecline: (AppUser friendRequest) {
-                    // TODO: decline request
+                // Incoming friend requests stream
+                StreamBuilder<List<AppUser>>(
+                  stream: _requestsStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Center(
+                          child: Text('Error loading requests: ${snapshot.error}'),
+                        ),
+                      );
+                    }
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final requests = snapshot.data ?? [];
+                    return FriendRequestsList(
+                      requests: requests,
+                      onAccept: (AppUser friendRequest) async {
+                        try {
+                          await _controller.acceptFriendRequest(fromUid: friendRequest.uid);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Friend added')),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
+                      },
+                      onDecline: (AppUser friendRequest) async {
+                        try {
+                          await _controller.declineFriendRequest(fromUid: friendRequest.uid);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Request declined')),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
+                      },
+                    );
                   },
                 ),
             ],
