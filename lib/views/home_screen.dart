@@ -5,10 +5,24 @@ import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
 import 'package:secret_sorcerer/widgets/dialogs/rules_dialog.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+
+  @override
+  void initState() {
+    super.initState();
+    AudioHelper.crossfade("TavernThemeMusic.wav");
+
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +60,10 @@ class HomeScreen extends StatelessWidget {
                   final lobbyRef = await controller.createLobby();
                   final lobbyId = lobbyRef.id;
 
-                  if (context.mounted) context.go('/lobby/$lobbyId');
+                  if (context.mounted) {
+                    context.go('/lobby/$lobbyId');
+                    AudioHelper.playSFX("hostJoin.wav");
+                  }
                 },
               ),
 
@@ -54,7 +71,11 @@ class HomeScreen extends StatelessWidget {
 
               PrimaryButton(
                 label: 'Join Game',
-                onPressed: () => context.go('/join'),
+                onPressed: () {
+                  AudioHelper.playSFX("enterButton.wav");
+                  context.go('/join');
+                  
+                },
               ),
 
               const Spacer(),

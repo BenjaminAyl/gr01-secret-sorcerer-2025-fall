@@ -9,7 +9,7 @@ import 'package:secret_sorcerer/views/home_screen.dart';
 import 'package:secret_sorcerer/views/login_screen.dart';
 import 'package:secret_sorcerer/views/signup_screen.dart';
 import 'package:secret_sorcerer/views/game_screen.dart';
-
+import 'package:secret_sorcerer/views/role_reveal_screen.dart';
 
 final GoRouter router = GoRouter(
   initialLocation: '/',
@@ -24,5 +24,6 @@ final GoRouter router = GoRouter(
     GoRoute(path: '/lobby/:code', builder: (context, state) => LobbyScreen(code: state.pathParameters['code']!),),
     GoRoute(path: '/game/:code', builder: (context, state) => GameScreen(code: state.pathParameters['code']!),),
     GoRoute(path: '/join', builder:(context, state)=> JoinLobbyScreen()),
+    GoRoute(path: '/reveal/:code', builder: (context, state) => RoleRevealScreen(code: state.pathParameters['code']!),),
   ]
 );

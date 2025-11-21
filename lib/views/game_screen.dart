@@ -1,11 +1,28 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:secret_sorcerer/constants/app_colours.dart';
+import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
-import 'package:secret_sorcerer/controllers/game_controller.dart';
 import 'package:secret_sorcerer/views/game_view.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
+
+// CLEAN NOTIFICATION & SCROLL OVERLAYS
+import 'package:secret_sorcerer/views/overlays/game_notification_bar.dart';
+import 'package:secret_sorcerer/views/overlays/role_scroll_overlay.dart';
+
+// Existing overlays
+import 'package:secret_sorcerer/views/overlays/policy_overlay.dart';
+import 'package:secret_sorcerer/views/overlays/voting_overlay.dart';
+import 'package:secret_sorcerer/views/overlays/executive_overlays.dart';
+
+// WIN SCREEN
+import 'package:secret_sorcerer/views/overlays/game_win_overlay.dart';
+
+
 
 class GameScreen extends StatefulWidget {
   final String code;
@@ -15,50 +32,44 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen>
+    with TickerProviderStateMixin {
   final _firebase = FirebaseController();
-  final _controller = GameController();
   late final WizardGameView _game;
   String? _creatorId;
   String? _uid;
-  bool _navigatedOut = false; //no double navigation
+  bool _navigatedOut = false;
+
+  bool _myVoteCastLocal = false;
 
   @override
   void initState() {
     super.initState();
     _uid = FirebaseAuth.instance.currentUser?.uid;
-    _game = WizardGameView();
-  }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+    _game = WizardGameView(
+      lobbyId: widget.code,
+      myUid: _uid!,
+    );
 
-  ///Host-only timer start
-  void _maybeStartHostTimer() {
-    if (_creatorId != null && _uid == _creatorId) {
-      _controller.startCountdown(widget.code, () {
-        //Host triggers Firestore reset through endGame()
-      });
-    }
-  }
-
-  void _goBackToLobby() {
-    if (_navigatedOut || !mounted) return;  //no duplicates
-    _navigatedOut = true;
-    context.go('/lobby/${widget.code}');
+    AudioHelper.crossfade("TavernMusic.wav");
   }
 
   @override
   Widget build(BuildContext context) {
-    final lobbyRef =
-        FirebaseFirestore.instance.collection('lobbies').doc(widget.code);
-    final stateRef =
-        FirebaseFirestore.instance.collection('states').doc(widget.code);
+    final lobbyRef = FirebaseFirestore.instance
+        .collection('lobbies')
+        .doc(widget.code);
 
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    final stateRef = FirebaseFirestore.instance
+        .collection('states')
+        .doc(widget.code);
+
+    final size = MediaQuery.of(context).size;
+    final width = size.width;
+    final height = size.height;
+
+    return StreamBuilder(
       stream: lobbyRef.snapshots(),
       builder: (context, lobbySnap) {
         if (!lobbySnap.hasData) {
@@ -67,24 +78,9 @@ class _GameScreenState extends State<GameScreen> {
           );
         }
 
-        // Lobby deleted → everyone goes home
-        if (!lobbySnap.data!.exists) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
-          return const SizedBox.shrink();
-        }
+        _creatorId ??= lobbySnap.data!.data()?['creatorId'];
 
-        final lobby = lobbySnap.data!.data()!;
-        _creatorId ??= lobby['creatorId'] as String?;
-        final status = lobby['status'];
-
-        // Lobby reset → go back to lobby
-        if (status == 'waiting') {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
-        }
-
-        _maybeStartHostTimer();
-
-        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        return StreamBuilder(
           stream: stateRef.snapshots(),
           builder: (context, stateSnap) {
             if (!stateSnap.hasData) {
@@ -93,56 +89,239 @@ class _GameScreenState extends State<GameScreen> {
               );
             }
 
-            // Game state deleted → end of round → return to lobby
+            // If the state was deleted → return to lobby
             if (!stateSnap.data!.exists) {
-              WidgetsBinding.instance.addPostFrameCallback((_) => _goBackToLobby());
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!_navigatedOut) {
+                  _navigatedOut = true;
+                  context.go('/lobby/${widget.code}');
+                }
+              });
               return const SizedBox.shrink();
             }
 
-            final data = stateSnap.data!.data()!;
-            final phase = data['phase'] ?? 'countdown';
-            final time = (data['time'] ?? 10) as int;
-            _game.updateCountdown(time);
+            final rawState = stateSnap.data!.data();
+            if (rawState == null) return const SizedBox.shrink();
+
+            // Assign live state fields
+            _game.phase = rawState['phase'] ?? 'start';
+            _game.executivePower = rawState['executivePower'];
+            _game.executiveActive = rawState['executiveActive'] == true;
+            _game.executiveTarget = rawState['executiveTarget'];
+            _game.pendingExecutiveCards =
+                List<String>.from(rawState['pendingExecutiveCards'] ?? []);
+
+            if (_game.phase != 'voting' &&
+                _game.phase != 'voting_results') {
+              _myVoteCastLocal = false;
+            }
+
+            // --- WIN SCREEN FIELDS ---
+            final winnerTeam = rawState['winnerTeam'];
+            final bool isGameOver =
+                _game.phase == 'game_over' && winnerTeam != null;
+
+
 
             return Scaffold(
-              backgroundColor: Colors.black,
-              body: Stack(
-                children: [
-                  GameWidget(game: _game),
-                  //HUD overlay for timer and info
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    top: 48,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Lobby: ${widget.code}',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Text(
-                          'Phase: $phase',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Time: $time',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
+              backgroundColor: AppColors.primaryBrand,
+              body: SafeArea(
+                child: Stack(
+                  children: [
+
+                    // --- MAIN GAME BOARD ---
+                    GameWidget(
+                      game: _game,
+                      overlayBuilderMap: {
+                        'ControlsOverlay': (context, game) {
+                          final g = game as WizardGameView;
+                          final isHM = g.isHeadmasterClient;
+                          final isSC = g.isSpellcasterClient;
+                          final isDead = g.dead[_uid] == true;
+                          final isHost = _uid == _creatorId;
+
+                          final showHMDiscard =
+                              isHM &&
+                              g.phase == 'hm_discard' &&
+                              g.pendingCards.length == 3;
+
+                          final showSCChoose =
+                              isSC &&
+                              g.phase == 'sc_choose' &&
+                              g.pendingCards.length == 2;
+
+                          final showVoting =
+                              (g.phase == 'voting' && !isHM && !isDead) ||
+                              (g.phase == 'voting_results' && !isHM);
+
+                          // --- TOP UI (ROLE PILL + NOTIF BAR) ---
+                          Widget topHUD = Column(
+                            children: [
+                              SizedBox(height: height * 0.012),
+
+                              // ROLE PILL
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: width * 0.05,
+                                  vertical: height * 0.01,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondaryBrand.withOpacity(0.75),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Text(
+                                  isHM
+                                      ? "You are the Headmaster"
+                                      : isSC
+                                          ? "You are the Spellcaster"
+                                          : "You are a Wizard",
+                                  style: TextStyles.bodySmall.copyWith(
+                                    fontSize: height * 0.02,
+                                    color: AppColors.textAccent,
+                                  ),
+                                ),
+                              ),
+
+                              SizedBox(height: height * 0.005),
+
+                              GameNotificationBar(
+                                game: g,
+                                isHM: isHM,
+                                isSC: isSC,
+                                width: width,
+                                height: height,
+                              ),
+                            ],
+                          );
+
+                          // Hide scroll when overlays active
+                          final bool showScroll =
+                              !showHMDiscard &&
+                              !showSCChoose &&
+                              !showVoting &&
+                              g.phase != 'executive_investigate' &&
+                              g.phase != 'executive_investigate_result' &&
+                              g.phase != 'executive_peek3' &&
+                              g.phase != 'executive_choose_hm' &&
+                              g.phase != 'executive_choose_hm_result' &&
+                              g.phase != 'executive_kill' &&
+                              g.phase != 'executive_kill_result' &&
+                              g.phase != 'executive_kill_result_arch' &&
+                              !isDead;
+
+                          return Stack(
+                            children: [
+
+                              // BACK BUTTON (HOST)
+                              if (isHost)
+                                Positioned(
+                                  top: height * 0.015,
+                                  left: width * 0.02,
+                                  child: IconButton(
+                                    icon: const Icon(
+                                      Icons.arrow_back_ios_new,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: () async {
+                                      final ok = await _confirmEndGame(context);
+                                      if (ok == true) {
+                                        await FirebaseFirestore.instance
+                                            .collection('states')
+                                            .doc(widget.code)
+                                            .delete();
+                                        await _firebase.resetLobby(widget.code);
+                                      }
+                                    },
+                                  ),
+                                ),
+
+                              Align(
+                                alignment: Alignment.topCenter,
+                                child: topHUD,
+                              ),
+
+                              // POLICY / SC / VOTE / EXEC OVERLAYS
+                              if (showHMDiscard)
+                                PolicyOverlay(
+                                  game: g,
+                                  height: height,
+                                  width: width,
+                                  isHMPhase: true,
+                                ),
+
+                              if (showSCChoose)
+                                PolicyOverlay(
+                                  game: g,
+                                  height: height,
+                                  width: width,
+                                  isHMPhase: false,
+                                ),
+
+                              if (showVoting)
+                                VotingOverlay(
+                                  game: g,
+                                  height: height,
+                                  width: width,
+                                  myVoteCastLocal: _myVoteCastLocal,
+                                  onVote: (yes) async {
+                                    if (_myVoteCastLocal || g.iVoted) return;
+                                    setState(() {
+                                      _myVoteCastLocal = true;
+                                    });
+                                    await g.castVote(yes);
+                                  },
+                                ),
+
+                              Positioned.fill(
+                                child: _buildExecutiveStack(
+                                  g,
+                                  width,
+                                  height,
+                                  isHM,
+                                  isHost,
+                                ),
+                              ),
+
+                              if (showScroll)
+                                Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: RoleScrollOverlay(
+                                    game: g,
+                                    myUid: _uid!,
+                                    height: height,
+                                    width: width,
+                                  ),
+                                ),
+                            ],
+                          );
+                        }
+                      },
                     ),
-                  ),
-                ],
+
+
+                    // --- WIN SCREEN (TOP OF EVERYTHING) ---
+                    if (isGameOver)
+                      Positioned.fill(
+                        child: GameWinOverlay(
+                          game: _game,
+                          width: width,
+                          height: height,
+                          isHost: _uid == _creatorId,
+                          winnerTeam: winnerTeam!,
+                          onHostReturn: _uid == _creatorId
+                              ? () async {
+                                  await FirebaseFirestore.instance
+                                      .collection('states')
+                                      .doc(widget.code)
+                                      .delete();
+                                  await _firebase.resetLobby(widget.code);
+                                }
+                              : null,
+                        ),
+                      ),
+
+                  ],
+                ),
               ),
             );
           },
@@ -150,4 +329,113 @@ class _GameScreenState extends State<GameScreen> {
       },
     );
   }
+
+  Future<bool?> _confirmEndGame(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.black87,
+        title: const Text("End Game?",
+            style: TextStyle(color: Colors.white)),
+        content: const Text(
+          "Send everyone back to the lobby?",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Yes, return"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExecutiveStack(
+    WizardGameView g,
+    double width,
+    double height,
+    bool isHM,
+    bool isHost,
+  ) {
+    return Stack(
+      children: [
+        if (g.phase == 'executive_investigate')
+          ExecutiveInvestigateOverlay(
+            isHeadmaster: isHM,
+            height: height,
+          ),
+
+        if (g.phase == 'executive_investigate_result')
+          ExecutiveInvestigateResultOverlay(
+            game: g,
+            isHeadmaster: isHM,
+            height: height,
+            onContinue: () => _firebase.endExecutive(g.lobbyId),
+          ),
+
+        if (g.phase == 'executive_peek3')
+          ExecutivePeek3Overlay(
+            game: g,
+            isHeadmaster: isHM,
+            height: height,
+            width: width,
+            onContinue: () => _firebase.endExecutive(g.lobbyId),
+          ),
+
+        if (g.phase == 'executive_choose_hm')
+          ExecutiveChooseHeadmasterOverlay(
+            isHeadmaster: isHM,
+            height: height,
+          ),
+
+        if (g.phase == 'executive_choose_hm_result')
+          ExecutiveChooseHeadmasterResultOverlay(
+            game: g,
+            isHeadmaster: isHM,
+            height: height,
+            onConfirm: () =>
+                _firebase.confirmNextHeadmaster(g.lobbyId),
+          ),
+
+        if (g.phase == 'executive_kill')
+          ExecutiveKillOverlay(
+            isHeadmaster: isHM,
+            height: height,
+          ),
+
+        if (g.phase == 'executive_kill_result' ||
+            g.phase == 'executive_kill_result_arch')
+          ExecutiveKillResultOverlay(
+            game: g,
+            height: height,
+            width: width,
+            isArch: g.phase == 'executive_kill_result_arch',
+            isHost: isHost,
+            onContinue: isHost
+                ? () async {
+                    // ⭐ IMPORTANT FIX ⭐
+                    if (g.phase == 'executive_kill_result_arch') {
+                      // ARCHWARLOCK DEATH = IMMEDIATE GAME OVER
+                      await _firebase.setGameOver(
+                        lobbyId: g.lobbyId,
+                        winningTeam: "order",
+                      );
+                      return; // <-- stops further processing
+                    }
+
+                    // Normal kill → continue game
+                    await _firebase.finalizeKill(g.lobbyId);
+                  }
+                : null,
+          ),
+      ],
+    );
+  }
+
+
 }

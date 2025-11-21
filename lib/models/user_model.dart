@@ -28,6 +28,7 @@ class AppUser {
         'uid': uid,
         'email': email,
         'username': username,
+        'nickname': nickname,
         'nickame': nickname,
         'wins': wins,
         'losses': losses,

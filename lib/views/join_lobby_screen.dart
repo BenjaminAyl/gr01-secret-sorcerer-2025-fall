@@ -6,6 +6,7 @@ import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
 
 class JoinLobbyScreen extends StatefulWidget {
   const JoinLobbyScreen({super.key});
@@ -44,7 +45,10 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
     }
 
     await controller.joinLobby(code, user.uid);
-    if (mounted) context.go('/lobby/$code');
+    if (mounted) {
+      context.go('/lobby/$code');
+      AudioHelper.playSFX("hostJoin.wav");
+    }
   }
 
   @override
@@ -59,7 +63,12 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
             color: AppColors.customAccent,
             size: AppSpacing.iconSizeLarge,
           ),
-          onPressed: () => context.go('/home'),
+          onPressed: () async {
+            AudioHelper.playSFX("back_button.wav");
+            await Future.delayed(const Duration(milliseconds: 120));
+            if (context.mounted) context.go('/home');
+          },
+
         ),
       ),
       body: SafeArea(
