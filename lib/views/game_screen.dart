@@ -418,7 +418,6 @@ class _GameScreenState extends State<GameScreen>
             isHost: isHost,
             onContinue: isHost
                 ? () async {
-                    // ⭐ IMPORTANT FIX ⭐
                     if (g.phase == 'executive_kill_result_arch') {
                       // ARCHWARLOCK DEATH = IMMEDIATE GAME OVER
                       await _firebase.setGameOver(
@@ -428,7 +427,6 @@ class _GameScreenState extends State<GameScreen>
                       return; // <-- stops further processing
                     }
 
-                    // Normal kill → continue game
                     await _firebase.finalizeKill(g.lobbyId);
                   }
                 : null,
