@@ -47,8 +47,11 @@ flutter:
     - assets/audio/hostJoin.wav
     - assets/audio/paperRoll.mp3
     - assets/audio/TavernThemeMusic.wav
+    - assets/audio/deckDiscard.wav
     - assets/images/trophy.png
     - assets/textures/fog.png
     - assets/textures/fog2.png
     - assets/textures/parchment.png
     - assets/logos/title_logo.png
+    - assets/images/game-assets/board/deck.png
+    - assets/images/game-assets/board/discard.png
