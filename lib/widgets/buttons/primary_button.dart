@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
 
 class PrimaryButton extends StatelessWidget {
   final String label;
@@ -22,7 +23,10 @@ class PrimaryButton extends StatelessWidget {
     return SizedBox(
       width: width ?? AppSpacing.cardWidthNarrow,
       child: ElevatedButton(
-        onPressed: onPressed,
+        onPressed: () {
+          AudioHelper.playSFX('enterButton.wav'); 
+          onPressed(); 
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.secondaryBrand,
           foregroundColor: Colors.white,

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
-import 'rules_pages.dart'; // 👈 import your pages list
+import 'package:secret_sorcerer/utils/audio_helper.dart';
+import 'rules_pages.dart';
 
 class RulesDialog extends StatefulWidget {
   const RulesDialog({super.key});
@@ -68,7 +69,10 @@ class _RulesDialogState extends State<RulesDialog> {
                   IconButton(
                     icon: const Icon(Icons.close),
                     color: AppColors.primaryBrand,
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      AudioHelper.playSFX('paperRoll.mp3');
+                    },
                   ),
                 ],
               ),
@@ -83,6 +87,7 @@ class _RulesDialogState extends State<RulesDialog> {
                   itemCount: rulesPages.length,
                   onPageChanged: (index) {
                     setState(() => _currentPage = index);
+                    AudioHelper.playSFX('paperRoll.mp3');
                   },
                   itemBuilder: (_, index) {
                     return SingleChildScrollView(
