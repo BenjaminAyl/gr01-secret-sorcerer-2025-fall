@@ -17,6 +17,9 @@ class WizardGameView extends FlameGame with TapCallbacks {
   final FirebaseController _firebase = FirebaseController();
   int failedTurns = 0;
   TextComponent? turnCounterText;
+  List<String> deck = [];
+  List<String> discard = [];
+
 
   List<GamePlayer> players = [];
   Set<String> _prevDeadUids = {};
@@ -179,7 +182,12 @@ class WizardGameView extends FlameGame with TapCallbacks {
     phase = (data['phase'] ?? 'start').toString();
     pendingCards = List<String>.from(
         (data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
-
+    deck = List<String>.from(
+      (data['deck'] as List?)?.map((e) => e.toString()) ?? [],
+    );
+    discard = List<String>.from(
+      (data['discard'] as List?)?.map((e) => e.toString()) ?? [],
+    );
     
 
     executivePower = data['executivePower'];

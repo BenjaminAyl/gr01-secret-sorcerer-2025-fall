@@ -472,11 +472,8 @@ class FirebaseController {
       }
     });
   }
-
   Future<void> _drawForHeadmaster(String lobbyId) async {
     final ref = _firestore.collection('states').doc(lobbyId);
-
-    // Ensure at least 3 cards are available (refill from discard if needed)
     await _ensureDeck(lobbyId, 3);
 
     await _firestore.runTransaction((tx) async {
@@ -486,8 +483,6 @@ class FirebaseController {
       final data = snap.data()!;
       final phase = data['phase'];
       final owner = data['pendingOwner'];
-
-      // Only draw if we are not already in hm_discard and no pending cards exist
       if (phase == 'hm_discard' || owner == 'headmaster') return;
 
       List deck = List.from((data['deck'] as List?) ?? []);
@@ -496,15 +491,26 @@ class FirebaseController {
 
       if (spellcaster == null || pending.isNotEmpty) return;
 
+      bool didShuffle = false;
       if (deck.length < 3) {
         List discard = List.from((data['discard'] as List?) ?? []);
         if (discard.isNotEmpty) {
           discard.shuffle();
           deck = deck + discard;
           discard = [];
+
+          didShuffle = true;
         }
       }
+
       if (deck.length < 3) return;
+      if (didShuffle) {
+        tx.update(ref, {
+          'deck': deck,
+          'discard': [],
+        });
+        return;
+      }
 
       final draw = deck.sublist(0, 3);
       final newDeck = deck.sublist(3);
@@ -516,7 +522,25 @@ class FirebaseController {
         'phase': 'hm_discard',
       });
     });
+    final doc = await ref.get();
+    final data = doc.data()!;
+    List deck = List.from((data['deck'] as List?) ?? []);
+
+    if (deck.length >= 3 && (data['pendingCards'] as List).isEmpty) {
+      await Future.delayed(const Duration(seconds: 1));
+
+      final draw = deck.sublist(0, 3);
+      final newDeck = deck.sublist(3);
+
+      await ref.update({
+        'pendingCards': draw,
+        'pendingOwner': 'headmaster',
+        'deck': newDeck,
+        'phase': 'hm_discard',
+      });
+    }
   }
+
 
   /// HM discards one of the 3
   Future<void> headmasterDiscard(String lobbyId, int discardIndex) async {

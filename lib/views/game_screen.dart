@@ -17,6 +17,8 @@ import 'package:secret_sorcerer/views/overlays/executive_overlays.dart';
 import 'package:secret_sorcerer/views/overlays/turn_counter_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/auto_warning_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/game_win_overlay.dart';
+import 'package:secret_sorcerer/views/overlays/deck_discard_overlay.dart';
+
 
 class GameScreen extends StatefulWidget {
   final String code;
@@ -124,6 +126,11 @@ class _GameScreenState extends State<GameScreen>
                 _game.overlays.add('turn_counter');
               }
             });
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!_game.overlays.isActive('deck_discard')) {
+                _game.overlays.add('deck_discard');
+              }
+            });
             final winnerTeam = rawState['winnerTeam'];
             final bool isGameOver =
                 _game.phase == 'game_over' && winnerTeam != null;
@@ -140,6 +147,8 @@ class _GameScreenState extends State<GameScreen>
                             const AutoWarningOverlay(),
                         'turn_counter': (context, game) =>
                             TurnCounterOverlay(game: game as WizardGameView),
+                        'deck_discard': (context, game) =>
+                            DeckDiscardOverlay(game: game as WizardGameView),
 
                         'ControlsOverlay': (context, game) {
                           final g = game as WizardGameView;
