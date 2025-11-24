@@ -16,16 +16,30 @@ class LobbyController {
     playerId = user.uid;
     lobbyStream = _firebase.watchLobby(lobbyId);
   }
-  Future<void> leaveLobby(Map<String, dynamic> data) async {
-    final creatorId = data['creatorId'].toString();
-    final isHost = creatorId == playerId;
+ Future<void> leaveLobby({
+    required String lobbyId,
+    required String myUid,
+    required Map<String, dynamic> lobbyData,
+  }) async {
+    final creatorId = lobbyData['creatorId'] as String?;
+    final players = List<String>.from(lobbyData['players'] ?? []);
+    final isHost = creatorId == myUid;
 
     if (isHost) {
+      // Host leaving then completely delete lobby for everyone
       await _firebase.deleteLobby(lobbyId);
-    } else {
-      await _firebase.leaveLobby(lobbyId, playerId);
+      return;
+    }
+
+    // Client leaving
+    await _firebase.leaveLobby(lobbyId, myUid);
+
+    // If host already gone or only 1 left -> delete lobby
+    if (players.length <= 1) {
+      await _firebase.deleteLobby(lobbyId);
     }
   }
+
 
   Future<void> startGame(List<String> ids) async {
     await _firebase.startGame(lobbyId, ids);

@@ -26,6 +26,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   late String playerId;
   bool _attemptedAutoJoin = false;
   bool _isStartingGame = false;
+  bool _navigatingToGame = false;
 
   @override
   void initState() {
@@ -44,10 +45,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
     await _lobbyController.init(widget.code);
   }
 
-  /// Cleans up when leaving or closing app
   Future<void> _cleanupOnExit() async {
     try {
-      if(_isStartingGame) return;
+      if (_isStartingGame || _navigatingToGame) return; // <-- CHANGE
+
       final snap = await FirebaseFirestore.instance
           .collection('lobbies')
           .doc(widget.code)
@@ -55,32 +56,35 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
       if (snap.exists) {
         final data = snap.data()!;
-        await _lobbyController.leaveLobby(data);
+        await _lobbyController.leaveLobby(
+          lobbyId: widget.code,
+          myUid: playerId,
+          lobbyData: data,
+        );
       }
-    } catch (_) {
-      // ignore if already deleted
-    }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
+    _cleanupOnExit(); 
     super.dispose();
   }
 
 
+
   Future<void> _leave(Map<String, dynamic> data) async {
-    final isHost = data['creatorId'] == playerId;
-    if (isHost) {
-      setState(() {});
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await _lobbyController.leaveLobby(data);
-        if (mounted) context.go('/home');
-      });
-    } else {
-      await _lobbyController.leaveLobby(data);
-      if (mounted) context.go('/home');
-    }
+    if (_isStartingGame) return;
+
+    await _lobbyController.leaveLobby(
+      lobbyId: widget.code,
+      myUid: playerId,
+      lobbyData: data,
+    );
+
+    if (mounted) context.go('/home');
   }
+
 
   // Host starts the game
   Future<void> _start(List<String> ids) async {
@@ -134,6 +138,14 @@ class _LobbyScreenState extends State<LobbyScreen> {
               if (mounted) context.go('/home');
             });
           }
+          if (status == 'playing') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _navigatingToGame = true; 
+                context.go('/reveal/${widget.code}');
+              }
+            });
+          }
 
           // Move to game screen
           if (status == 'playing') {
@@ -163,9 +175,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ),
                 onPressed: () async {
                   AudioHelper.playSFX("back_button.wav");
-                  await Future.delayed(const Duration(milliseconds: 120)); // small delay
-                  _leave(data);
+                  await Future.delayed(const Duration(milliseconds: 120));
+                  await _leave(data);
                 },
+
 
               ),
             ),

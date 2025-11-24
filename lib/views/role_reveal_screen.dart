@@ -360,59 +360,102 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
 
   //Partners Widget
   Widget buildPartners(
-      String role, List<String> partners, Color accent, double w) {
-    if (partners.isEmpty) return const SizedBox.shrink();
+    String myRole,
+    List<String> partnerNames,
+    Color accent,
+    double w,
+  ) {
+    if (partnerNames.isEmpty) return const SizedBox.shrink();
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final stateSnap = FirebaseFirestore.instance
+        .collection('states')
+        .doc(widget.code)
+        .get();
 
-    final arch = partners.isNotEmpty ? partners.first : "";
-    final warlocks = partners.skip(1).toList();
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future: stateSnap,
+      builder: (context, snap) {
+        if (!snap.hasData) return const SizedBox.shrink();
 
-    return Column(
-      children: [
-        Text(
-          "You sense the presence of:",
-          style: TextStyle(color: Colors.white70, fontSize: w * 0.045),
-        ),
-        SizedBox(height: w * 0.03),
+        final data = snap.data!.data();
+        if (data == null) return const SizedBox.shrink();
 
-        if (arch.isNotEmpty) ...[
-          Text(
-            "ArchWarlock:",
-            style: TextStyle(
-              color: accent,
-              fontSize: w * 0.06,
-              fontWeight: FontWeight.bold,
+        final players = List<Map<String, dynamic>>.from(data['players'] ?? []);
+        final partnerEntries = partnerNames.map((nickname) {
+          // Find the player that matches this nickname
+          final match = players.firstWhere(
+            (p) => p['username'] != uid &&
+                  (p['username'] == nickname ||
+                    (p['nickname'] ?? "") == nickname),
+            orElse: () => {},
+          );
+
+          final role = match.isNotEmpty ? match['role'] : "warlock";
+          return MapEntry(nickname, role);
+        }).toList();
+
+        // Sort for display groups
+        final archPartners = partnerEntries
+            .where((e) => e.value == "archwarlock")
+            .map((e) => e.key)
+            .toList();
+
+        final warlockPartners = partnerEntries
+            .where((e) => e.value == "warlock")
+            .map((e) => e.key)
+            .toList();
+
+        return Column(
+          children: [
+            Text(
+              "You sense the presence of:",
+              style: TextStyle(color: Colors.white70, fontSize: w * 0.045),
             ),
-          ),
-          Text(
-            arch,
-            style: TextStyle(
-              color: accent.withOpacity(0.85),
-              fontSize: w * 0.05,
-            ),
-          ),
-          SizedBox(height: w * 0.05),
-        ],
+            SizedBox(height: w * 0.03),
 
-        if (warlocks.isNotEmpty) ...[
-          Text(
-            "Warlocks:",
-            style: TextStyle(
-              color: accent,
-              fontSize: w * 0.06,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          ...warlocks.map(
-            (name) => Text(
-              name,
-              style: TextStyle(
-                color: accent.withOpacity(0.85),
-                fontSize: w * 0.05,
+            if (archPartners.isNotEmpty) ...[
+              Text(
+                "ArchWarlock:",
+                style: TextStyle(
+                  color: accent,
+                  fontSize: w * 0.06,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-          ),
-        ],
-      ],
+              ...archPartners.map(
+                (name) => Text(
+                  name,
+                  style: TextStyle(
+                    color: accent.withOpacity(0.85),
+                    fontSize: w * 0.05,
+                  ),
+                ),
+              ),
+              SizedBox(height: w * 0.05),
+            ],
+
+            if (warlockPartners.isNotEmpty) ...[
+              Text(
+                "Warlocks:",
+                style: TextStyle(
+                  color: accent,
+                  fontSize: w * 0.06,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              ...warlockPartners.map(
+                (name) => Text(
+                  name,
+                  style: TextStyle(
+                    color: accent.withOpacity(0.85),
+                    fontSize: w * 0.05,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
-}
+      }

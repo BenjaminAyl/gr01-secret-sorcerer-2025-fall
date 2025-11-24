@@ -13,6 +13,7 @@ class GameState {
 
   late int charms = 0; 
   late int curses = 0; 
+  late int failedTurns = 0;
 
   late String headmaster = '';
   late String? spellcaster = '';
@@ -42,7 +43,7 @@ class GameState {
     phase = 'start';
     charms = 0;
     curses = 0;
-
+    failedTurns = 0;
     players = _players;
 
     // 10 curse + 7 charm deck (randomized)
@@ -71,6 +72,7 @@ class GameState {
       'phase': phase,
       'charms': charms,
       'curses': curses,
+      'failedTurns': failedTurns,
       'headmaster': headmaster,
       'spellcaster': spellcaster,
       'spellcasterNominee': spellcasterNominee,

@@ -10,9 +10,24 @@ import 'package:secret_sorcerer/views/login_screen.dart';
 import 'package:secret_sorcerer/views/signup_screen.dart';
 import 'package:secret_sorcerer/views/game_screen.dart';
 import 'package:secret_sorcerer/views/role_reveal_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 final GoRouter router = GoRouter(
   initialLocation: '/',
+  redirect: (context, state) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    final String loc = state.uri.path;  
+    final bool loggingIn = loc == '/' || loc == '/signup';
+    if (user == null) {
+      return loggingIn ? null : '/';
+    }
+    if (user != null && loggingIn) {
+      return '/home';
+    }
+
+    return null; // allow navigation
+  },
   routes: [
     GoRoute(path: '/', builder:(context, state) => LoginScreen()),
     GoRoute(path: '/signup', builder:(context, state) => SignupScreen()),

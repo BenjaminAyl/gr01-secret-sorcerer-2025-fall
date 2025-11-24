@@ -9,20 +9,14 @@ import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/views/game_view.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
-
-// CLEAN NOTIFICATION & SCROLL OVERLAYS
 import 'package:secret_sorcerer/views/overlays/game_notification_bar.dart';
 import 'package:secret_sorcerer/views/overlays/role_scroll_overlay.dart';
-
-// Existing overlays
 import 'package:secret_sorcerer/views/overlays/policy_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/voting_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/executive_overlays.dart';
-
-// WIN SCREEN
+import 'package:secret_sorcerer/views/overlays/turn_counter_overlay.dart';
+import 'package:secret_sorcerer/views/overlays/auto_warning_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/game_win_overlay.dart';
-
-
 
 class GameScreen extends StatefulWidget {
   final String code;
@@ -89,7 +83,7 @@ class _GameScreenState extends State<GameScreen>
               );
             }
 
-            // If the state was deleted → return to lobby
+            // If the state was deleted -> return to lobby
             if (!stateSnap.data!.exists) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!_navigatedOut) {
@@ -116,23 +110,37 @@ class _GameScreenState extends State<GameScreen>
               _myVoteCastLocal = false;
             }
 
-            // --- WIN SCREEN FIELDS ---
+            if (_game.phase == 'auto_warning') {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!_game.overlays.isActive('auto_warning')) {
+                  _game.overlays.add('auto_warning');
+                }
+              });
+            } else {
+              _game.overlays.remove('auto_warning');
+            }
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!_game.overlays.isActive('turn_counter')) {
+                _game.overlays.add('turn_counter');
+              }
+            });
             final winnerTeam = rawState['winnerTeam'];
             final bool isGameOver =
                 _game.phase == 'game_over' && winnerTeam != null;
-
-
 
             return Scaffold(
               backgroundColor: AppColors.primaryBrand,
               body: SafeArea(
                 child: Stack(
                   children: [
-
-                    // --- MAIN GAME BOARD ---
                     GameWidget(
                       game: _game,
                       overlayBuilderMap: {
+                        'auto_warning': (context, game) =>
+                            const AutoWarningOverlay(),
+                        'turn_counter': (context, game) =>
+                            TurnCounterOverlay(game: game as WizardGameView),
+
                         'ControlsOverlay': (context, game) {
                           final g = game as WizardGameView;
                           final isHM = g.isHeadmasterClient;
@@ -151,15 +159,13 @@ class _GameScreenState extends State<GameScreen>
                               g.pendingCards.length == 2;
 
                           final showVoting =
-                              (g.phase == 'voting' && !isHM && !isDead) ||
-                              (g.phase == 'voting_results' && !isHM);
+                            (!isHM && g.phase == 'voting' && !isDead) ||
+                            (g.phase == 'voting_results');
 
-                          // --- TOP UI (ROLE PILL + NOTIF BAR) ---
+
                           Widget topHUD = Column(
                             children: [
                               SizedBox(height: height * 0.012),
-
-                              // ROLE PILL
                               Container(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: width * 0.05,
@@ -174,16 +180,14 @@ class _GameScreenState extends State<GameScreen>
                                       ? "You are the Headmaster"
                                       : isSC
                                           ? "You are the Spellcaster"
-                                          : "You are a Wizard",
+                                          : "Waiting...",
                                   style: TextStyles.bodySmall.copyWith(
                                     fontSize: height * 0.02,
                                     color: AppColors.textAccent,
                                   ),
                                 ),
                               ),
-
                               SizedBox(height: height * 0.005),
-
                               GameNotificationBar(
                                 game: g,
                                 isHM: isHM,
@@ -194,7 +198,6 @@ class _GameScreenState extends State<GameScreen>
                             ],
                           );
 
-                          // Hide scroll when overlays active
                           final bool showScroll =
                               !showHMDiscard &&
                               !showSCChoose &&
@@ -207,40 +210,49 @@ class _GameScreenState extends State<GameScreen>
                               g.phase != 'executive_kill' &&
                               g.phase != 'executive_kill_result' &&
                               g.phase != 'executive_kill_result_arch' &&
-                              !isDead;
+                              !isDead &&
+                              g.phase != 'auto_warning';
 
                           return Stack(
                             children: [
-
-                              // BACK BUTTON (HOST)
-                              if (isHost)
-                                Positioned(
-                                  top: height * 0.015,
-                                  left: width * 0.02,
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.arrow_back_ios_new,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () async {
-                                      final ok = await _confirmEndGame(context);
-                                      if (ok == true) {
-                                        await FirebaseFirestore.instance
-                                            .collection('states')
-                                            .doc(widget.code)
-                                            .delete();
-                                        await _firebase.resetLobby(widget.code);
-                                      }
-                                    },
-                                  ),
+                              // Unified BACK button (host + client)
+                            Positioned(
+                              top: height * 0.015,
+                              left: width * 0.02,
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.arrow_back_ios_new,
+                                  color: Colors.white,
                                 ),
+                                onPressed: () async {
+                                  if (isHost) {
+                                    // Host flow
+                                    final ok = await _confirmEndGame(context);
+                                    if (ok == true) {
+                                      await FirebaseFirestore.instance
+                                          .collection('states')
+                                          .doc(widget.code)
+                                          .delete();
+                                      await _firebase.resetLobby(widget.code);
+                                    }
+                                  } else {
+                                    // Client flow
+                                    final ok = await _confirmLeaveGame(context);
+                                    if (ok == true) {
+                                      await _firebase.clientTerminateGame(widget.code);
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+
+
 
                               Align(
                                 alignment: Alignment.topCenter,
                                 child: topHUD,
                               ),
 
-                              // POLICY / SC / VOTE / EXEC OVERLAYS
                               if (showHMDiscard)
                                 PolicyOverlay(
                                   game: g,
@@ -264,7 +276,8 @@ class _GameScreenState extends State<GameScreen>
                                   width: width,
                                   myVoteCastLocal: _myVoteCastLocal,
                                   onVote: (yes) async {
-                                    if (_myVoteCastLocal || g.iVoted) return;
+                                    if (_myVoteCastLocal ||
+                                        g.iVoted) return;
                                     setState(() {
                                       _myVoteCastLocal = true;
                                     });
@@ -298,8 +311,6 @@ class _GameScreenState extends State<GameScreen>
                       },
                     ),
 
-
-                    // --- WIN SCREEN (TOP OF EVERYTHING) ---
                     if (isGameOver)
                       Positioned.fill(
                         child: GameWinOverlay(
@@ -314,12 +325,12 @@ class _GameScreenState extends State<GameScreen>
                                       .collection('states')
                                       .doc(widget.code)
                                       .delete();
-                                  await _firebase.resetLobby(widget.code);
+                                  await _firebase.resetLobby(
+                                      widget.code);
                                 }
                               : null,
                         ),
                       ),
-
                   ],
                 ),
               ),
@@ -354,6 +365,31 @@ class _GameScreenState extends State<GameScreen>
       ),
     );
   }
+    Future<bool?> _confirmLeaveGame(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.black87,
+        title: const Text("Leave Game?",
+            style: TextStyle(color: Colors.white)),
+        content: const Text(
+          "Leaving will end the game for everyone.",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("End Game"),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildExecutiveStack(
     WizardGameView g,
@@ -414,28 +450,26 @@ class _GameScreenState extends State<GameScreen>
             game: g,
             height: height,
             width: width,
-            isArch: g.phase == 'executive_kill_result_arch',
+            isArch: g.phase ==
+                'executive_kill_result_arch',
             isHost: isHost,
             onContinue: isHost
                 ? () async {
-                    // ⭐ IMPORTANT FIX ⭐
-                    if (g.phase == 'executive_kill_result_arch') {
-                      // ARCHWARLOCK DEATH = IMMEDIATE GAME OVER
+                    if (g.phase ==
+                        'executive_kill_result_arch') {
                       await _firebase.setGameOver(
                         lobbyId: g.lobbyId,
                         winningTeam: "order",
                       );
-                      return; // <-- stops further processing
+                      return;
                     }
 
-                    // Normal kill → continue game
-                    await _firebase.finalizeKill(g.lobbyId);
+                    await _firebase.finalizeKill(
+                        g.lobbyId);
                   }
                 : null,
           ),
       ],
     );
   }
-
-
 }

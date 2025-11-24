@@ -15,6 +15,8 @@ class WizardGameView extends FlameGame with TapCallbacks {
   final String lobbyId;
   final String myUid;
   final FirebaseController _firebase = FirebaseController();
+  int failedTurns = 0;
+  TextComponent? turnCounterText;
 
   List<GamePlayer> players = [];
   Set<String> _prevDeadUids = {};
@@ -31,6 +33,8 @@ class WizardGameView extends FlameGame with TapCallbacks {
   String? executiveTarget;
   List<String> pendingExecutiveCards = [];
   Map<String, bool> dead = {};
+  String? lastHeadmaster;
+  String? lastSpellcaster;
 
   // live phase and pending cards for UI
   String phase = 'start';
@@ -54,8 +58,6 @@ class WizardGameView extends FlameGame with TapCallbacks {
   bool get isSpellcasterClient =>
       spellcasterIndex != null &&
       players[spellcasterIndex!].username == myUid;
-
-  // 🔥 NEW: voting counts only ALIVE non-HM wizards
   int get _alivePlayerCount =>
       players.where((p) => !(dead[p.username] ?? false)).length;
 
@@ -173,15 +175,21 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
     charms = (data['charms'] ?? 0) as int;
     curses = (data['curses'] ?? 0) as int;
+    failedTurns = (data['failedTurns'] ?? 0) as int;
     phase = (data['phase'] ?? 'start').toString();
     pendingCards = List<String>.from(
         (data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
+
+    
 
     executivePower = data['executivePower'];
     executiveActive = data['executiveActive'] == true;
     executiveTarget = data['executiveTarget'];
     pendingExecutiveCards =
         List<String>.from(data['pendingExecutiveCards'] ?? []);
+
+    lastHeadmaster = data['lastHeadmaster']?.toString();
+    lastSpellcaster = data['lastSpellcaster']?.toString();
 
     await _resolveNicknames();
 
@@ -360,13 +368,19 @@ class WizardGameView extends FlameGame with TapCallbacks {
       await _firebase.selectKillTarget(lobbyId, targetUid);
       return;
     }
-
-    // NORMAL nomination phase
     if (phase == 'start') {
       if (!isHM) return;
+
+      //cant pick yourself
       if (targetUid == hmUid) return;
+
+      //cantt pick last HM or last SC
+      if (lastHeadmaster != null && targetUid == lastHeadmaster) return;
+      if (lastSpellcaster != null && targetUid == lastSpellcaster) return;
+
       await _firebase.nominateSpellcaster(lobbyId, targetUid);
     }
+
   }
 
   // Let overlay call this for Yes/No cards
@@ -401,27 +415,51 @@ class WizardGameView extends FlameGame with TapCallbacks {
       final wasHM = hat.index == _prevHeadmaster;
       final wasSC = _prevSpellcaster != null && hat.index == _prevSpellcaster;
 
-      // Don’t highlight dead ghosts
       final uid = (hat.index >= 0 && hat.index < players.length)
           ? players[hat.index].username
           : '';
+
+      // Dead = never highlight
       if (dead[uid] == true) {
         hat.clearColorEffects();
         continue;
       }
 
-      if (isHM && changedHM) {
+      // BLOCKED players (last HM or last SC)
+      final isBlocked =
+          (lastHeadmaster != null && uid == lastHeadmaster) ||
+          (lastSpellcaster != null && uid == lastSpellcaster);
+
+      if (isBlocked && !isHM) {
+        hat.paint = Paint()
+          ..colorFilter = const ColorFilter.mode(
+            Colors.redAccent,
+            BlendMode.modulate,
+          );
         hat.clearColorEffects();
-        hat.add(
-          ColorEffect(
-            const Color(0xFFFFFFFF),
-            EffectController(duration: 0.6),
-            opacityFrom: 0.0,
-            opacityTo: 0.7,
-          ),
-        );
-      } else if (isSC && changedSC && phase != 'voting') {
-        // Solid purple only when officially elected (not during voting pulse)
+        continue;
+      }
+
+      //Only reset paint if not HM
+      if (!isHM) {
+        hat.paint = Paint();
+      }
+      if (isHM) {
+        if (!hat.hasWhiteHMGlow) {
+          hat.clearColorEffects();
+          hat.add(
+            ColorEffect(
+              const Color(0xFFFFFFFF),
+              EffectController(duration: 0.6),
+              opacityFrom: 0.0,
+              opacityTo: 0.7,
+            ),
+          );
+          hat.hasWhiteHMGlow = true;
+        }
+        continue; // nothing overrides HM glow
+      }
+      if (isSC && changedSC && phase != 'voting') {
         hat.clearColorEffects();
         hat.add(
           ColorEffect(
@@ -431,7 +469,11 @@ class WizardGameView extends FlameGame with TapCallbacks {
             opacityTo: 0.6,
           ),
         );
-      } else if ((wasHM && !isHM) || (wasSC && !isSC)) {
+        continue;
+      }
+
+      // Fade-out old HM/SC
+      if ((wasHM && !isHM) || (wasSC && !isSC)) {
         hat.clearColorEffects();
         hat.add(
           ColorEffect(
@@ -447,6 +489,8 @@ class WizardGameView extends FlameGame with TapCallbacks {
     _prevHeadmaster = headmasterIndex;
     _prevSpellcaster = spellcasterIndex;
   }
+
+
 
   void _updateNomineePulse() {
     if (_prevNominee != null &&
@@ -571,6 +615,8 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
 
   Effect? _pulseColor;
   bool dead = false;
+  bool hasWhiteHMGlow = false;
+
 
   PlayerHatComponent(this.index, this.nickname, this.onTap)
       : super(size: Vector2.all(45), anchor: Anchor.center);
@@ -599,6 +645,13 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   void setColorTint(Color color) {
     paint = Paint()..colorFilter = ColorFilter.mode(color, BlendMode.modulate);
   }
+  void setBlockedRed() {
+  paint = Paint()
+    ..colorFilter = const ColorFilter.mode(
+      Colors.redAccent,
+      BlendMode.modulate,
+    );
+  }
 
   //Block taps if dead
   @override
@@ -614,14 +667,20 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   }
 
   void clearColorEffects() {
-    children.whereType<ColorEffect>().toList().forEach((e) => e.removeFromParent());
+    hasWhiteHMGlow = false; 
+    children
+        .whereType<ColorEffect>()
+        .toList()
+        .forEach((e) => e.removeFromParent());
   }
+
 
   @override
   set size(Vector2 v) {
     super.size = v;
     if (isMounted) _relayoutLabel();
   }
+  
 
   void startPulse({
     required Color color,

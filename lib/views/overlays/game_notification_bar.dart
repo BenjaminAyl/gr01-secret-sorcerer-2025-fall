@@ -23,22 +23,28 @@ class GameNotificationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final phase = game.phase;
     final execPower = game.executivePower;
-    final isExec = game.executiveActive == true;
+    final bool isExec = game.executiveActive == true;
 
-    // TITLE + SUBTITLE
+    /// MAIN TITLE AND SUBTITLE
     String title = "";
     String? subtitle;
 
     if (isExec) {
       title = "Executive Power Active";
-      subtitle = _execDescription(phase, execPower);
-    } else if (phase == "voting") {
-      title = "Voting in Progress…";
-    } else if (phase == "voting_results") {
-      title = "Vote Results";
+      subtitle = _execDescription(phase);
     } else {
-      subtitle = _nextWarning(game);
-      title = subtitle != null ? "Warning" : "";
+      final msg = _phaseDescription(phase);
+      title = msg.$1;
+      subtitle = msg.$2;
+
+      /// If nothing found, try warning system
+      subtitle ??= _nextWarning(game);
+
+      /// Final fallback
+      if (title.isEmpty && subtitle == null) {
+        title = "Game In Progress";
+        subtitle = "Waiting for the next action…";
+      }
     }
 
     return Container(
@@ -98,21 +104,89 @@ class GameNotificationBar extends StatelessWidget {
     );
   }
 
-
-  String? _execDescription(String phase, String? power) {
+  /// EXECUTIVE POWER TEXT
+  String? _execDescription(String phase) {
     switch (phase) {
       case 'executive_investigate':
-        return "Investigate Loyalty – choose a wizard.";
+        return isHM
+            ? "Investigate Loyalty – choose a wizard."
+            : "Headmaster is investigating loyalty…";
+
       case 'executive_peek3':
-        return "Foresight – reviewing the next three spells.";
+        return isHM
+            ? "Foresight – reviewing the next three spells."
+            : "Headmaster is peeking at three spells…";
+
       case 'executive_choose_hm':
-        return "Choose the next Headmaster.";
+        return isHM
+            ? "Choose the next Headmaster."
+            : "Headmaster is selecting the next Headmaster…";
+
       case 'executive_kill':
-        return "Cast a lethal spell – select a wizard to eliminate.";
+        return isHM
+            ? "Choose a wizard to eliminate."
+            : "Headmaster is selecting someone to eliminate…";
     }
     return null;
   }
 
+  /// PHASE → TEXT SYSTEM
+  (String, String?) _phaseDescription(String phase) {
+    switch (phase) {
+      case "start":
+        return (
+          "Nominate a Spellcaster",
+          isHM
+              ? "Tap a player to nominate."
+              : "Headmaster is choosing a nominee…"
+        );
+
+      case "voting":
+        return (
+          "Voting In Progress…",
+          isHM
+              ? "Waiting for everyone to vote…"
+              : "Cast your vote now."
+        );
+
+      case "voting_results":
+        return (
+          "Vote Results",
+          "Resolving the election outcome…"
+        );
+
+      case "hm_discard":
+        return (
+          "Headmaster Discarding",
+          isHM
+              ? "Choose a spell to discard."
+              : "Headmaster is discarding…"
+        );
+
+      case "sc_choose":
+        return (
+          "Spellcaster Choosing",
+          isSC
+              ? "Choose a spell to enact."
+              : "Spellcaster is selecting a spell…"
+        );
+
+      case "resolving":
+        return (
+          "Resolving Turn",
+          "Preparing the next round…"
+        );
+
+      // We intentionally do NOT include:
+      // - auto_warning
+      // - game_over
+      // - kill_archwarlock
+      // per your request.
+
+      default:
+        return ("Game In Progress", "Phase: $phase");
+    }
+  }
   String? _nextWarning(WizardGameView g) {
     final pc = g.players.length;
     final c = g.curses;

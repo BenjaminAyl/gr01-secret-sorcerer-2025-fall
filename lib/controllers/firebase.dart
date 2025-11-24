@@ -63,6 +63,13 @@ class FirebaseController {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
+    
+  await _firestore.collection('users').doc(user.uid).update({
+    'currentLobby': code,
+    'currentGame': null, // ensure clean state
+  });
+
+
     return lobbyRef;
   }
 
@@ -77,15 +84,32 @@ class FirebaseController {
       'players': FieldValue.arrayUnion([playerId]),
       'nicknames.$playerId': nickname,
     });
+
+    await _firestore.collection('users').doc(playerId).update({
+      'currentLobby': lobbyId,
+      'currentGame': null,
+    });
   }
 
   Future<void> leaveLobby(String lobbyId, String playerId) async {
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
-    await lobbyRef.update({
-      'players': FieldValue.arrayRemove([playerId]),
-      'nicknames.$playerId': FieldValue.delete(),
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(lobbyRef);
+      if (!snap.exists) return;
+
+      tx.update(lobbyRef, {
+        'players': FieldValue.arrayRemove([playerId]),
+        'nicknames.$playerId': FieldValue.delete(),
+      });
+    });
+
+    await _firestore.collection('users').doc(playerId).update({
+      'currentLobby': null,
+      'currentGame': null,
     });
   }
+
 
   Future<void> deleteLobby(String lobbyId) async {
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
@@ -114,6 +138,12 @@ class FirebaseController {
 
     await stateRef.set(state.toMap());
     await lobbyRef.update({'status': 'playing'});
+
+    for (final uid in playerIds) {
+      await _firestore.collection('users').doc(uid).update({
+        'currentGame': lobbyId,
+      });
+}
   }
 
 
@@ -141,22 +171,33 @@ class FirebaseController {
 
       final data = snap.data()!;
       final phase = data['phase'];
-      final headmaster = data['headmaster'];
-
-      // Can only nominate from 'start' (or any phase you want to allow nomination from)
       if (phase != 'start') return;
+
+      final headmaster = data['headmaster'];
+      final lastHM = data['lastHeadmaster'];
+      final lastSC = data['lastSpellcaster'];
+
+      //Block current HM
       if (nomineeUid == headmaster) return;
 
+      //Block last Headmaster
+      if (lastHM != null && nomineeUid == lastHM) return;
+
+      //Block last Spellcaster
+      if (lastSC != null && nomineeUid == lastSC) return;
+
+      // If we passed all checks: valid nominee
       tx.update(ref, {
         'spellcasterNominee': nomineeUid,
         'spellcaster': null,
-        'votes': <String, String>{},  // clear previous votes
+        'votes': <String, String>{},
         'phase': 'voting',
         'pendingCards': [],
         'pendingOwner': null,
       });
     });
   }
+
   Future<void> castVote(String lobbyId, String voterUid, bool approve) async {
     final ref = _firestore.collection('states').doc(lobbyId);
 
@@ -212,52 +253,144 @@ class FirebaseController {
       }
     });
 
+    // If we just entered results phase, wait before processing outcome
     if (becameResultsPhase) {
       await Future.delayed(const Duration(seconds: 8));
 
-      final after = await _firestore.collection('states').doc(lobbyId).get();
+      final after = await ref.get();
       final d = after.data();
       if (d == null) return;
 
+      // ensure we are still in results phase
       if (d['phase'] != 'voting_results') return;
 
       if (passed) {
         final nominee = (d['spellcasterNominee'] ?? '') as String;
         if (nominee.isNotEmpty) {
-          await _firestore.collection('states').doc(lobbyId).update({
+          final players =
+              (d['players'] as List).cast<Map<String, dynamic>>();
+          final sc = players.firstWhere(
+            (p) => p['username'] == nominee,
+            orElse: () => {},
+          );
+
+          final isArch = sc['role'] == 'archwarlock';
+          final cursesBefore = (d['curses'] ?? 0) as int;
+          if (isArch && cursesBefore >= 3) {
+            await ref.update({
+              'phase': 'game_over',
+              'winnerTeam': 'warlocks',
+              'spellcaster': nominee,
+              'spellcasterNominee': null,
+              'votes': {},
+              'votePassed': FieldValue.delete(),
+              'pendingCards': [],
+              'pendingOwner': null,
+            });
+            return; // stop normal flow
+          }
+
+          // Normal successful election
+          await ref.update({
             'spellcaster': nominee,
             'spellcasterNominee': null,
-            'votes': <String, String>{},
+            'votes': {},
             'votePassed': FieldValue.delete(),
             'phase': 'start',
             'pendingCards': [],
             'pendingOwner': null,
           });
+
+          // Draw cards for HM -> SC flow
           await _drawForHeadmaster(lobbyId);
         }
       } else {
-        await _firestore.collection('states').doc(lobbyId).update({
-          'spellcaster': null,
-          'spellcasterNominee': null,
-          'votes': <String, String>{},
-          'votePassed': FieldValue.delete(),
-          'phase': 'resolving',
-          'pendingCards': [],
-          'pendingOwner': null,
-        });
-        await _rotateHeadmaster(lobbyId);
-      }
+  // Voting failed
+       // Voting failed
+    int failedTurnsAfter = 0;
+
+    await _firestore.runTransaction((tx) async {
+      final snap2 = await tx.get(ref);
+      if (!snap2.exists) return;
+
+      int failed = (snap2.data()?['failedTurns'] ?? 0) as int;
+      failed++;
+
+      failedTurnsAfter = failed; // <-- SAVE THE CORRECT VALUE
+
+      tx.update(ref, {
+        'failedTurns': failed,
+        'spellcaster': null,
+        'spellcasterNominee': null,
+        'votes': {},
+        'votePassed': FieldValue.delete(),
+        'pendingCards': [],
+        'pendingOwner': null,
+        'phase': failed >= 3 ? 'auto_warning' : 'resolving',
+      });
+    });
+
+    // USE THE VALUE FROM THE TRANSACTION
+    if (failedTurnsAfter >= 3) {
+      await _autoTopCard(lobbyId);
+    } else {
+      await _rotateHeadmaster(lobbyId);
     }
+      }
+
+    }
+  }
+  Future<void> _autoTopCard(String lobbyId) async {
+    final ref = _firestore.collection('states').doc(lobbyId);
+    await ref.update({
+      'phase': 'auto_warning',
+      'notif': "Chaotic Magic Surges...",
+    });
+    await Future.delayed(const Duration(milliseconds: 3000)); //change this to prolong animation
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      List<String> deck = List<String>.from(data['deck']);
+      List<String> discard = List<String>.from(data['discard']);
+
+      int charms = data['charms'] ?? 0;
+      int curses = data['curses'] ?? 0;
+
+      // Reset fail count first
+      tx.update(ref, {'failedTurns': 0});
+      final top = deck.removeAt(0);
+      discard.add(top);
+      if (top == 'charm') charms++;
+      if (top == 'curse') curses++;
+
+      tx.update(ref, {
+        'deck': deck,
+        'discard': discard,
+        'charms': charms,
+        'curses': curses,
+        'phase': 'resolving',
+      });
+    });
+    await _rotateHeadmaster(lobbyId);
   }
 
 
   Future<void> _rotateHeadmaster(String lobbyId) async {
     final stateRef = _firestore.collection('states').doc(lobbyId);
+
+    final doc = await stateRef.get();
+    if (!doc.exists) return;
+    if (doc.data()?['phase'] == 'game_over') return;
+
     await _firestore.runTransaction((tx) async {
       final snap = await tx.get(stateRef);
       if (!snap.exists) return;
 
       final data = snap.data()!;
+      if (data['phase'] == 'game_over') return; // safeguard inside transaction too
+
       final players = (data['players'] as List?) ?? [];
       if (players.isEmpty) return;
 
@@ -266,7 +399,7 @@ class FirebaseController {
       final currentIdx = (data['headmasterIdx'] ?? 0) as int;
       int nextIdx = currentIdx;
 
-      //advance until we find a living wizard
+      // advance until a living player is found
       for (int i = 0; i < players.length; i++) {
         nextIdx = (nextIdx + 1) % players.length;
         final candidateUid = players[nextIdx]['username'] ?? '';
@@ -289,6 +422,7 @@ class FirebaseController {
       });
     });
   }
+
 
 
   Future<void> incrementCharm(String lobbyId) async {
@@ -417,10 +551,10 @@ class FirebaseController {
   String? _executivePowerFor(int players, int curses) {
 
     //TESTING: enable executive powers for small test games
-    if (players < 5) { 
-    if (curses == 1) return 'kill'; //not meant to play with under 5
-    return null;
-    }
+    // if (players < 5) { 
+    // if (curses == 1) return 'kill'; //not meant to play with under 5
+    // return null;
+    // }
 
     //real game
     // 5–6 players
@@ -555,6 +689,10 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
       if (!snap.exists) return;
 
       final data = snap.data()!;
+
+      // 🔒 If the game ended during the kill, stop
+      if (data['phase'] == 'game_over') return;
+
       final target = data['executiveTarget'];
       if (target == null) return;
 
@@ -570,9 +708,12 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
         'phase': 'resolving',
       });
     });
+    final doc = await ref.get();
+    if (doc.data()?['phase'] == 'game_over') return;
 
     await _rotateHeadmaster(lobbyId);
   }
+
 
 
   Future<void> spellcasterChoose(String lobbyId, int enactIndex) async {
@@ -590,13 +731,12 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
       final data = snap.data()!;
       final phase = data['phase'];
       final owner = data['pendingOwner'];
+      if (phase == 'game_over') return;
 
       if (phase != 'sc_choose' || owner != 'spellcaster') return;
 
-      List<String> pending =
-          List<String>.from((data['pendingCards'] ?? []).cast<String>());
-      List<String> discard =
-          List<String>.from((data['discard'] ?? []).cast<String>());
+      List<String> pending = List<String>.from((data['pendingCards'] ?? []).cast<String>());
+      List<String> discard = List<String>.from((data['discard'] ?? []).cast<String>());
       int charms = data['charms'] ?? 0;
       int curses = data['curses'] ?? 0;
       finalPlayersCount = (data['players'] as List).length;
@@ -626,6 +766,7 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
         }
       }
 
+      // --- GAME OVER CONDITIONS ---
       if (charms >= 5) {
         tx.update(ref, {
           'charms': charms,
@@ -646,11 +787,11 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
         return;
       }
 
+      // ArchWarlock auto-win
       if (curses >= 3) {
         final scUid = data['spellcaster'];
         if (scUid != null) {
-          final players =
-              (data['players'] as List).cast<Map<String, dynamic>>();
+          final players = (data['players'] as List).cast<Map<String, dynamic>>();
           final sc = players.firstWhere(
             (p) => p['username'] == scUid,
             orElse: () => {},
@@ -668,6 +809,7 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
         }
       }
 
+      // Update normal policy enact
       tx.update(ref, {
         'charms': charms,
         'curses': curses,
@@ -679,6 +821,7 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
 
       if (!execTriggered) return;
 
+      // EXECUTIVE POWER HANDLING
       if (execPowerToTrigger == "investigate") {
         tx.update(ref, {
           'executivePower': 'investigate',
@@ -709,17 +852,13 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
       }
     });
 
-    final snapshot = await _firestore.collection('states').doc(lobbyId).get();
-    final endingData = snapshot.data();
-    if (endingData == null) return;
-
-    final phaseAfter = endingData['phase'];
-    if (phaseAfter == 'game_over') return;
-
+    final fresh = await ref.get();
+    if (fresh.data()?['phase'] == 'game_over') return;
     if (execTriggered) return;
 
     await _rotateHeadmaster(lobbyId);
   }
+
 
   //role assignment below
   List<GamePlayer> _assignRoles(List<String> ids) {
@@ -781,12 +920,26 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
 
   return players;
 }
+  Future<void> clientTerminateGame(String lobbyId) async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    await _firestore.collection('users').doc(uid).update({
+      'currentGame': null,
+      'currentLobby': null,
+    });
+
+    // Delete state + lobby
+    await _firestore.collection('states').doc(lobbyId).delete().catchError((_) {});
+    await _firestore.collection('lobbies').doc(lobbyId).delete().catchError((_) {});
+  }
+
+
 
 Future<void> setGameOver({
   required String lobbyId,
   required String winningTeam, // "order" or "warlocks"
 }) async {
   final ref = _firestore.collection('states').doc(lobbyId);
+  
 
   await ref.update({
     'phase': 'game_over',
@@ -802,7 +955,22 @@ Future<void> setGameOver({
     'votes': {},
     'votePassed': FieldValue.delete(),
   });
+  final playersDoc = await _firestore.collection('states').doc(lobbyId).get();
+  if (playersDoc.exists) {
+    final players = (playersDoc.data()?['players'] as List?)
+        ?.map((p) => p['username'] as String)
+        .toList() ?? [];
+
+    for (final uid in players) {
+      await _firestore.collection('users').doc(uid).update({
+        'currentGame': null,
+      });
+    }
+  }
+
+  
 }
+
 
 
 }
