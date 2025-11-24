@@ -171,22 +171,33 @@ class FirebaseController {
 
       final data = snap.data()!;
       final phase = data['phase'];
-      final headmaster = data['headmaster'];
-
-      // Can only nominate from 'start' (or any phase you want to allow nomination from)
       if (phase != 'start') return;
+
+      final headmaster = data['headmaster'];
+      final lastHM = data['lastHeadmaster'];
+      final lastSC = data['lastSpellcaster'];
+
+      //Block current HM
       if (nomineeUid == headmaster) return;
 
+      //Block last Headmaster
+      if (lastHM != null && nomineeUid == lastHM) return;
+
+      //Block last Spellcaster
+      if (lastSC != null && nomineeUid == lastSC) return;
+
+      // If we passed all checks: valid nominee
       tx.update(ref, {
         'spellcasterNominee': nomineeUid,
         'spellcaster': null,
-        'votes': <String, String>{},  // clear previous votes
+        'votes': <String, String>{},
         'phase': 'voting',
         'pendingCards': [],
         'pendingOwner': null,
       });
     });
   }
+
   Future<void> castVote(String lobbyId, String voterUid, bool approve) async {
     final ref = _firestore.collection('states').doc(lobbyId);
 

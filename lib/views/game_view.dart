@@ -33,6 +33,8 @@ class WizardGameView extends FlameGame with TapCallbacks {
   String? executiveTarget;
   List<String> pendingExecutiveCards = [];
   Map<String, bool> dead = {};
+  String? lastHeadmaster;
+  String? lastSpellcaster;
 
   // live phase and pending cards for UI
   String phase = 'start';
@@ -185,6 +187,9 @@ class WizardGameView extends FlameGame with TapCallbacks {
     executiveTarget = data['executiveTarget'];
     pendingExecutiveCards =
         List<String>.from(data['pendingExecutiveCards'] ?? []);
+
+    lastHeadmaster = data['lastHeadmaster']?.toString();
+    lastSpellcaster = data['lastSpellcaster']?.toString();
 
     await _resolveNicknames();
 
@@ -363,13 +368,19 @@ class WizardGameView extends FlameGame with TapCallbacks {
       await _firebase.selectKillTarget(lobbyId, targetUid);
       return;
     }
-
-    // NORMAL nomination phase
     if (phase == 'start') {
       if (!isHM) return;
+
+      //cant pick yourself
       if (targetUid == hmUid) return;
+
+      //cantt pick last HM or last SC
+      if (lastHeadmaster != null && targetUid == lastHeadmaster) return;
+      if (lastSpellcaster != null && targetUid == lastSpellcaster) return;
+
       await _firebase.nominateSpellcaster(lobbyId, targetUid);
     }
+
   }
 
   // Let overlay call this for Yes/No cards
@@ -412,6 +423,21 @@ class WizardGameView extends FlameGame with TapCallbacks {
         hat.clearColorEffects();
         continue;
       }
+      final isBlocked =
+          (lastHeadmaster != null && uid == lastHeadmaster) ||
+          (lastSpellcaster != null && uid == lastSpellcaster);
+      if (isBlocked && !isHM) {
+        hat.paint = Paint()
+          ..colorFilter = const ColorFilter.mode(
+            Colors.redAccent,
+            BlendMode.modulate,
+          );
+        hat.clearColorEffects();
+        continue; // skip normal highlight logic
+      }
+
+      // If not blocked, reset paint
+      hat.paint = Paint();
 
       if (isHM && changedHM) {
         hat.clearColorEffects();
@@ -450,6 +476,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
     _prevHeadmaster = headmasterIndex;
     _prevSpellcaster = spellcasterIndex;
   }
+
 
   void _updateNomineePulse() {
     if (_prevNominee != null &&
@@ -602,6 +629,13 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   void setColorTint(Color color) {
     paint = Paint()..colorFilter = ColorFilter.mode(color, BlendMode.modulate);
   }
+  void setBlockedRed() {
+  paint = Paint()
+    ..colorFilter = const ColorFilter.mode(
+      Colors.redAccent,
+      BlendMode.modulate,
+    );
+  }
 
   //Block taps if dead
   @override
@@ -625,6 +659,7 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
     super.size = v;
     if (isMounted) _relayoutLabel();
   }
+  
 
   void startPulse({
     required Color color,
