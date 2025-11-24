@@ -264,20 +264,75 @@ class FirebaseController {
           await _drawForHeadmaster(lobbyId);
         }
       } else {
-        // Voting failed -> rotate HM
-        await ref.update({
-          'spellcaster': null,
-          'spellcasterNominee': null,
-          'votes': {},
-          'votePassed': FieldValue.delete(),
-          'phase': 'resolving',
-          'pendingCards': [],
-          'pendingOwner': null,
-        });
+  // Voting failed
+       // Voting failed
+    int failedTurnsAfter = 0;
 
-        await _rotateHeadmaster(lobbyId);
-      }
+    await _firestore.runTransaction((tx) async {
+      final snap2 = await tx.get(ref);
+      if (!snap2.exists) return;
+
+      int failed = (snap2.data()?['failedTurns'] ?? 0) as int;
+      failed++;
+
+      failedTurnsAfter = failed; // <-- SAVE THE CORRECT VALUE
+
+      tx.update(ref, {
+        'failedTurns': failed,
+        'spellcaster': null,
+        'spellcasterNominee': null,
+        'votes': {},
+        'votePassed': FieldValue.delete(),
+        'pendingCards': [],
+        'pendingOwner': null,
+        'phase': failed >= 3 ? 'auto_warning' : 'resolving',
+      });
+    });
+
+    // USE THE VALUE FROM THE TRANSACTION
+    if (failedTurnsAfter >= 3) {
+      await _autoTopCard(lobbyId);
+    } else {
+      await _rotateHeadmaster(lobbyId);
     }
+      }
+
+    }
+  }
+  Future<void> _autoTopCard(String lobbyId) async {
+    final ref = _firestore.collection('states').doc(lobbyId);
+    await ref.update({
+      'phase': 'auto_warning',
+      'notif': "Chaotic Magic Surges...",
+    });
+    await Future.delayed(const Duration(milliseconds: 3000)); //change this to prolong animation
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      List<String> deck = List<String>.from(data['deck']);
+      List<String> discard = List<String>.from(data['discard']);
+
+      int charms = data['charms'] ?? 0;
+      int curses = data['curses'] ?? 0;
+
+      // Reset fail count first
+      tx.update(ref, {'failedTurns': 0});
+      final top = deck.removeAt(0);
+      discard.add(top);
+      if (top == 'charm') charms++;
+      if (top == 'curse') curses++;
+
+      tx.update(ref, {
+        'deck': deck,
+        'discard': discard,
+        'charms': charms,
+        'curses': curses,
+        'phase': 'resolving',
+      });
+    });
+    await _rotateHeadmaster(lobbyId);
   }
 
 

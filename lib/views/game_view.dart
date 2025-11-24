@@ -15,6 +15,8 @@ class WizardGameView extends FlameGame with TapCallbacks {
   final String lobbyId;
   final String myUid;
   final FirebaseController _firebase = FirebaseController();
+  int failedTurns = 0;
+  TextComponent? turnCounterText;
 
   List<GamePlayer> players = [];
   Set<String> _prevDeadUids = {};
@@ -54,8 +56,6 @@ class WizardGameView extends FlameGame with TapCallbacks {
   bool get isSpellcasterClient =>
       spellcasterIndex != null &&
       players[spellcasterIndex!].username == myUid;
-
-  // 🔥 NEW: voting counts only ALIVE non-HM wizards
   int get _alivePlayerCount =>
       players.where((p) => !(dead[p.username] ?? false)).length;
 
@@ -173,9 +173,12 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
     charms = (data['charms'] ?? 0) as int;
     curses = (data['curses'] ?? 0) as int;
+    failedTurns = (data['failedTurns'] ?? 0) as int;
     phase = (data['phase'] ?? 'start').toString();
     pendingCards = List<String>.from(
         (data['pendingCards'] as List?)?.map((e) => e.toString()) ?? []);
+
+    
 
     executivePower = data['executivePower'];
     executiveActive = data['executiveActive'] == true;
