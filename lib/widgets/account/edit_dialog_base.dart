@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
+import 'package:secret_sorcerer/widgets/buttons/chip_button.dart';
 
 class EditDialogBase extends StatefulWidget {
   final String title;
@@ -94,24 +96,38 @@ class _EditDialogBaseState extends State<EditDialogBase> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            TextButton(
-              onPressed: _loading ? null : () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+            // ❌ Cancel chip
+            ChipButton(
+              icon: Icons.close,
+              filled: false,
+              onTap: _loading
+                  ? () {}
+                  : () {
+                      AudioHelper.playSFX("backButton.wav");
+                      Navigator.of(context).pop();
+                    },
             ),
             const SizedBox(width: 16),
-            ElevatedButton(
-              onPressed: _loading
-                  ? null
+
+            // ✅ Submit chip
+            ChipButton(
+              icon: _loading ? Icons.hourglass_empty : Icons.check,
+              filled: true,
+              onTap: _loading
+                  ? () {}
                   : () async {
                       setState(() => _error = null);
                       if (!_formKey.currentState!.validate()) return;
+
                       setState(() => _loading = true);
                       try {
                         final values = {
                           for (final f in widget.fields)
                             f.key: f.controller.text.trim(),
                         };
+
                         final err = await widget.onSubmit(values);
+
                         if (err == null && context.mounted) {
                           final resultValue = widget.fields.isNotEmpty
                               ? widget.fields.last.controller.text.trim()
@@ -122,16 +138,11 @@ class _EditDialogBaseState extends State<EditDialogBase> {
                           setState(() => _error = err);
                         }
                       } finally {
-                        if (mounted) setState(() => _loading = false);
+                        if (mounted) {
+                          setState(() => _loading = false);
+                        }
                       }
                     },
-              child: _loading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(widget.submitLabel),
             ),
           ],
         ),

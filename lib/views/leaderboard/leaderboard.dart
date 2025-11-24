@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
-import 'package:secret_sorcerer/controllers/user_auth.dart';
-import 'package:secret_sorcerer/models/user_model.dart';
 import 'package:secret_sorcerer/views/leaderboard/leaderboard_window.dart';
-import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
+import 'package:secret_sorcerer/widgets/buttons/back_nav_button.dart';
 
 class LeaderboardView extends StatefulWidget {
   const LeaderboardView({super.key});
@@ -17,7 +14,6 @@ class LeaderboardView extends StatefulWidget {
 }
 
 class _LeaderboardViewState extends State<LeaderboardView> {
-
   final FirebaseController _firebaseController = FirebaseController();
   List<Map<String, dynamic>> _allUsers = [];
 
@@ -32,20 +28,13 @@ class _LeaderboardViewState extends State<LeaderboardView> {
     setState(() => _allUsers = users);
   }
 
-@override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.secondaryBG,
       appBar: AppBar(
         backgroundColor: AppColors.secondaryBG,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.cancel,
-            color: AppColors.customAccent,
-            size: AppSpacing.iconSizeLarge,
-          ),
-          onPressed: () => context.go('/home'),
-        ),
+        leading: BackNavButtonSound(icon: Icons.cancel),
         centerTitle: true,
         title: const Text('Leaderboard', style: TextStyles.heading),
       ),
@@ -58,9 +47,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AppSpacing.gapXXL,
-                LeaderboardWindow(
-                  leaderboardData: _allUsers
-                ),
+                LeaderboardWindow(leaderboardData: _allUsers),
                 AppSpacing.gapXXL,
               ],
             ),

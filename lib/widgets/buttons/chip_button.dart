@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
 
 class ChipButton extends StatelessWidget {
   final IconData icon;
@@ -22,7 +23,7 @@ class ChipButton extends StatelessWidget {
               color: AppColors.customAccent.withOpacity(0.35),
               blurRadius: 10,
               spreadRadius: 1,
-            )
+            ),
           ]
         : <BoxShadow>[];
 
@@ -39,7 +40,10 @@ class ChipButton extends StatelessWidget {
           customBorder: const CircleBorder(),
           splashColor: AppColors.customAccent.withOpacity(0.25),
           highlightColor: Colors.white10,
-          onTap: onTap,
+          onTap: () {
+            AudioHelper.playSFX('enterButton.wav');
+            onTap();
+          },
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Icon(icon, size: 20, color: Colors.white),

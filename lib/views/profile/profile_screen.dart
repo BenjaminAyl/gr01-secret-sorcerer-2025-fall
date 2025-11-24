@@ -5,6 +5,7 @@ import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
+import 'package:secret_sorcerer/widgets/buttons/back_nav_button.dart';
 import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -37,14 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: AppColors.secondaryBG,
       appBar: AppBar(
         backgroundColor: AppColors.secondaryBG,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.cancel,
-            color: AppColors.customAccent,
-            size: AppSpacing.iconSizeLarge,
-          ),
-          onPressed: () => context.go('/home'),
-        ),
+        leading: BackNavButtonSound(icon: Icons.cancel),
         centerTitle: true,
         title: const Text('Profile', style: TextStyles.heading),
       ),
