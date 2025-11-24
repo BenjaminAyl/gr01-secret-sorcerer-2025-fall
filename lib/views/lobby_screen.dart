@@ -26,6 +26,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   late String playerId;
   bool _attemptedAutoJoin = false;
   bool _isStartingGame = false;
+  bool _navigatingToGame = false;
 
   @override
   void initState() {
@@ -46,7 +47,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   Future<void> _cleanupOnExit() async {
     try {
-      if (_isStartingGame) return;
+      if (_isStartingGame || _navigatingToGame) return; // <-- CHANGE
 
       final snap = await FirebaseFirestore.instance
           .collection('lobbies')
@@ -135,6 +136,14 @@ class _LobbyScreenState extends State<LobbyScreen> {
           if (status == 'closing') {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) context.go('/home');
+            });
+          }
+          if (status == 'playing') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _navigatingToGame = true; 
+                context.go('/reveal/${widget.code}');
+              }
             });
           }
 
