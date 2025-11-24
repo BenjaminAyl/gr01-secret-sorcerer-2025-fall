@@ -415,17 +415,21 @@ class WizardGameView extends FlameGame with TapCallbacks {
       final wasHM = hat.index == _prevHeadmaster;
       final wasSC = _prevSpellcaster != null && hat.index == _prevSpellcaster;
 
-      // Don’t highlight dead ghosts
       final uid = (hat.index >= 0 && hat.index < players.length)
           ? players[hat.index].username
           : '';
+
+      // Dead = never highlight
       if (dead[uid] == true) {
         hat.clearColorEffects();
         continue;
       }
+
+      // BLOCKED players (last HM or last SC)
       final isBlocked =
           (lastHeadmaster != null && uid == lastHeadmaster) ||
           (lastSpellcaster != null && uid == lastSpellcaster);
+
       if (isBlocked && !isHM) {
         hat.paint = Paint()
           ..colorFilter = const ColorFilter.mode(
@@ -433,24 +437,29 @@ class WizardGameView extends FlameGame with TapCallbacks {
             BlendMode.modulate,
           );
         hat.clearColorEffects();
-        continue; // skip normal highlight logic
+        continue;
       }
 
-      // If not blocked, reset paint
-      hat.paint = Paint();
-
-      if (isHM && changedHM) {
-        hat.clearColorEffects();
-        hat.add(
-          ColorEffect(
-            const Color(0xFFFFFFFF),
-            EffectController(duration: 0.6),
-            opacityFrom: 0.0,
-            opacityTo: 0.7,
-          ),
-        );
-      } else if (isSC && changedSC && phase != 'voting') {
-        // Solid purple only when officially elected (not during voting pulse)
+      //Only reset paint if not HM
+      if (!isHM) {
+        hat.paint = Paint();
+      }
+      if (isHM) {
+        if (!hat.hasWhiteHMGlow) {
+          hat.clearColorEffects();
+          hat.add(
+            ColorEffect(
+              const Color(0xFFFFFFFF),
+              EffectController(duration: 0.6),
+              opacityFrom: 0.0,
+              opacityTo: 0.7,
+            ),
+          );
+          hat.hasWhiteHMGlow = true;
+        }
+        continue; // nothing overrides HM glow
+      }
+      if (isSC && changedSC && phase != 'voting') {
         hat.clearColorEffects();
         hat.add(
           ColorEffect(
@@ -460,7 +469,11 @@ class WizardGameView extends FlameGame with TapCallbacks {
             opacityTo: 0.6,
           ),
         );
-      } else if ((wasHM && !isHM) || (wasSC && !isSC)) {
+        continue;
+      }
+
+      // Fade-out old HM/SC
+      if ((wasHM && !isHM) || (wasSC && !isSC)) {
         hat.clearColorEffects();
         hat.add(
           ColorEffect(
@@ -476,6 +489,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
     _prevHeadmaster = headmasterIndex;
     _prevSpellcaster = spellcasterIndex;
   }
+
 
 
   void _updateNomineePulse() {
@@ -601,6 +615,8 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
 
   Effect? _pulseColor;
   bool dead = false;
+  bool hasWhiteHMGlow = false;
+
 
   PlayerHatComponent(this.index, this.nickname, this.onTap)
       : super(size: Vector2.all(45), anchor: Anchor.center);
@@ -651,8 +667,13 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   }
 
   void clearColorEffects() {
-    children.whereType<ColorEffect>().toList().forEach((e) => e.removeFromParent());
+    hasWhiteHMGlow = false; 
+    children
+        .whereType<ColorEffect>()
+        .toList()
+        .forEach((e) => e.removeFromParent());
   }
+
 
   @override
   set size(Vector2 v) {
