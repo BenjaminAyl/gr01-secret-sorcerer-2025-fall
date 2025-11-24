@@ -7,6 +7,7 @@ import 'package:secret_sorcerer/models/user_model.dart';
 import 'package:secret_sorcerer/widgets/account/edit_nickname.dart';
 import 'package:secret_sorcerer/widgets/account/edit_password.dart';
 import 'package:secret_sorcerer/widgets/account/edit_username.dart';
+import 'package:secret_sorcerer/widgets/buttons/back_nav_button.dart';
 import 'package:secret_sorcerer/widgets/info_row.dart';
 import 'package:secret_sorcerer/widgets/buttons/pill_button.dart';
 import 'package:secret_sorcerer/controllers/user_auth.dart';
@@ -88,15 +89,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.secondaryBG,
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppColors.customAccent,
-            size: AppSpacing.iconSizeLarge,
-          ),
-          onPressed: () => context.pop(),
-          tooltip: 'Back',
-        ),
+        leading: BackNavButtonSound(icon: Icons.arrow_back),
         title: const Text('Edit Profile', style: TextStyles.subheading),
       ),
       body: SafeArea(

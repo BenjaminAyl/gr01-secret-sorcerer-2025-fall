@@ -16,12 +16,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-
   @override
   void initState() {
     super.initState();
     AudioHelper.crossfade("TavernThemeMusic.wav");
-
   }
 
   @override
@@ -74,7 +72,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: () {
                   AudioHelper.playSFX("enterButton.wav");
                   context.go('/join');
-                  
                 },
               ),
 
@@ -89,11 +86,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     Column(
                       children: [
                         GestureDetector(
-                          onTap: () => showDialog(
-                            context: context,
-                            barrierDismissible: true,
-                            builder: (_) => const RulesDialog(),
-                          ),
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              barrierDismissible: true,
+                              builder: (_) => const RulesDialog(),
+                            );
+                            AudioHelper.playSFX("paperRoll.mp3");
+                          },
                           child: Image.asset(
                             'assets/images/tome.png',
                             width: 70,
@@ -108,7 +108,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     Column(
                       children: [
                         GestureDetector(
-                          onTap: () => context.go('/leaderboard'),
+                          onTap: () {
+                            AudioHelper.playSFX("enterButton.wav");
+                            context.push('/leaderboard');
+                          },
                           child: Image.asset(
                             'assets/images/trophy.png',
                             width: 70,
@@ -123,7 +126,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     Column(
                       children: [
                         GestureDetector(
-                          onTap: () => context.go('/profile'),
+                          onTap: () {
+                            AudioHelper.playSFX("enterButton.wav");
+                            context.push('/profile');
+                          },
                           child: Image.asset(
                             'assets/images/wizard_hat.png',
                             width: 70,

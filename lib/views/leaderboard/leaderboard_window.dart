@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
-import 'package:secret_sorcerer/models/user_model.dart';
 
 class LeaderboardWindow extends StatelessWidget {
   final List<Map<String, dynamic>> leaderboardData;
@@ -73,7 +72,7 @@ class LeaderboardWindow extends StatelessWidget {
                                 ),
                               AppSpacing.gapWM,
                               Text(
-                                entry['Username'],
+                                entry['Nickname'],
                                 style: TextStyles.subheading,
                               )
                             ]
