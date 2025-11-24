@@ -215,29 +215,38 @@ class _GameScreenState extends State<GameScreen>
 
                           return Stack(
                             children: [
-                              if (isHost)
-                                Positioned(
-                                  top: height * 0.015,
-                                  left: width * 0.02,
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.arrow_back_ios_new,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () async {
-                                      final ok =
-                                          await _confirmEndGame(context);
-                                      if (ok == true) {
-                                        await FirebaseFirestore.instance
-                                            .collection('states')
-                                            .doc(widget.code)
-                                            .delete();
-                                        await _firebase.resetLobby(
-                                            widget.code);
-                                      }
-                                    },
-                                  ),
+                              // Unified BACK button (host + client)
+                            Positioned(
+                              top: height * 0.015,
+                              left: width * 0.02,
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.arrow_back_ios_new,
+                                  color: Colors.white,
                                 ),
+                                onPressed: () async {
+                                  if (isHost) {
+                                    // Host flow
+                                    final ok = await _confirmEndGame(context);
+                                    if (ok == true) {
+                                      await FirebaseFirestore.instance
+                                          .collection('states')
+                                          .doc(widget.code)
+                                          .delete();
+                                      await _firebase.resetLobby(widget.code);
+                                    }
+                                  } else {
+                                    // Client flow
+                                    final ok = await _confirmLeaveGame(context);
+                                    if (ok == true) {
+                                      await _firebase.clientTerminateGame(widget.code);
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+
+
 
                               Align(
                                 alignment: Alignment.topCenter,
@@ -356,6 +365,31 @@ class _GameScreenState extends State<GameScreen>
       ),
     );
   }
+    Future<bool?> _confirmLeaveGame(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.black87,
+        title: const Text("Leave Game?",
+            style: TextStyle(color: Colors.white)),
+        content: const Text(
+          "Leaving will end the game for everyone.",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("End Game"),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildExecutiveStack(
     WizardGameView g,

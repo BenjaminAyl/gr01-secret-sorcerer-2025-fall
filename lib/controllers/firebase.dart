@@ -63,6 +63,13 @@ class FirebaseController {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
+    
+  await _firestore.collection('users').doc(user.uid).update({
+    'currentLobby': code,
+    'currentGame': null, // ensure clean state
+  });
+
+
     return lobbyRef;
   }
 
@@ -77,15 +84,32 @@ class FirebaseController {
       'players': FieldValue.arrayUnion([playerId]),
       'nicknames.$playerId': nickname,
     });
+
+    await _firestore.collection('users').doc(playerId).update({
+      'currentLobby': lobbyId,
+      'currentGame': null,
+    });
   }
 
   Future<void> leaveLobby(String lobbyId, String playerId) async {
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
-    await lobbyRef.update({
-      'players': FieldValue.arrayRemove([playerId]),
-      'nicknames.$playerId': FieldValue.delete(),
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(lobbyRef);
+      if (!snap.exists) return;
+
+      tx.update(lobbyRef, {
+        'players': FieldValue.arrayRemove([playerId]),
+        'nicknames.$playerId': FieldValue.delete(),
+      });
+    });
+
+    await _firestore.collection('users').doc(playerId).update({
+      'currentLobby': null,
+      'currentGame': null,
     });
   }
+
 
   Future<void> deleteLobby(String lobbyId) async {
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
@@ -114,6 +138,12 @@ class FirebaseController {
 
     await stateRef.set(state.toMap());
     await lobbyRef.update({'status': 'playing'});
+
+    for (final uid in playerIds) {
+      await _firestore.collection('users').doc(uid).update({
+        'currentGame': lobbyId,
+      });
+}
   }
 
 
@@ -879,12 +909,26 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
 
   return players;
 }
+  Future<void> clientTerminateGame(String lobbyId) async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    await _firestore.collection('users').doc(uid).update({
+      'currentGame': null,
+      'currentLobby': null,
+    });
+
+    // Delete state + lobby
+    await _firestore.collection('states').doc(lobbyId).delete().catchError((_) {});
+    await _firestore.collection('lobbies').doc(lobbyId).delete().catchError((_) {});
+  }
+
+
 
 Future<void> setGameOver({
   required String lobbyId,
   required String winningTeam, // "order" or "warlocks"
 }) async {
   final ref = _firestore.collection('states').doc(lobbyId);
+  
 
   await ref.update({
     'phase': 'game_over',
@@ -900,7 +944,22 @@ Future<void> setGameOver({
     'votes': {},
     'votePassed': FieldValue.delete(),
   });
+  final playersDoc = await _firestore.collection('states').doc(lobbyId).get();
+  if (playersDoc.exists) {
+    final players = (playersDoc.data()?['players'] as List?)
+        ?.map((p) => p['username'] as String)
+        .toList() ?? [];
+
+    for (final uid in players) {
+      await _firestore.collection('users').doc(uid).update({
+        'currentGame': null,
+      });
+    }
+  }
+
+  
 }
+
 
 
 }
