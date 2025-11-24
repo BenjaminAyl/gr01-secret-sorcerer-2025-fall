@@ -17,7 +17,7 @@ class TurnCounterOverlay extends StatelessWidget {
 
     // Counter size
     final diameter = size.width * 0.11;
-    final nudgeRight = size.width * 0.008; //change to center better
+    final nudgeRight = size.width * 0.008;
 
     return Stack(
       children: [
@@ -30,19 +30,18 @@ class TurnCounterOverlay extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.black.withOpacity(0.42),
+              
+              // Solid ARGB black to avoid hue shift
+              color: const Color.fromARGB(140, 0, 0, 0),
+
+              // Crisp white border, no opacity
               border: Border.all(
-                color: Colors.white.withOpacity(0.95),
-                width: 3.2, // sharper
+                color: Colors.white,
+                width: 3.2,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.redAccent.withOpacity(0.7),
-                  blurRadius: 10,
-                  spreadRadius: 1.5,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+
+              // No glow, no shadow
+              boxShadow: const [],
             ),
             child: Text(
               "${game.failedTurns}",
