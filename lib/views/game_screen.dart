@@ -159,8 +159,9 @@ class _GameScreenState extends State<GameScreen>
                               g.pendingCards.length == 2;
 
                           final showVoting =
-                              (g.phase == 'voting' && !isHM && !isDead) ||
-                              (g.phase == 'voting_results' && !isHM);
+                            (!isHM && g.phase == 'voting' && !isDead) ||
+                            (g.phase == 'voting_results');
+
 
                           Widget topHUD = Column(
                             children: [
@@ -179,7 +180,7 @@ class _GameScreenState extends State<GameScreen>
                                       ? "You are the Headmaster"
                                       : isSC
                                           ? "You are the Spellcaster"
-                                          : "You are a Wizard",
+                                          : "Waiting...",
                                   style: TextStyles.bodySmall.copyWith(
                                     fontSize: height * 0.02,
                                     color: AppColors.textAccent,

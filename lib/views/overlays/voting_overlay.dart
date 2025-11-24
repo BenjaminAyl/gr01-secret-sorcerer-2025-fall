@@ -64,9 +64,10 @@ class VotingOverlay extends StatelessWidget {
         ),
       );
     }
+    final isHM = game.myUid == game.players[game.headmasterIndex].username;
 
     Widget inner;
-    if (!iVotedNow && !allIn) {
+    if (!isHM && !iVotedNow && !allIn) {
       // 1) Not voted yet -> show Yes/No cards
       inner = Column(
         mainAxisSize: MainAxisSize.min,
