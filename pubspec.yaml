@@ -57,3 +57,7 @@ flutter:
     - assets/images/game-assets/board/deck.png
     - assets/images/game-assets/board/discard.png
     - assets/images/game-assets/board/background.png
+    - assets/images/hats/hatDefault.png
+    - assets/images/hats/hatBlue.png
+    - assets/images/hats/hatPink.png
+    - assets/images/hats/hatGreen.png
