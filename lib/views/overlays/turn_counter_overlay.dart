@@ -10,38 +10,23 @@ class TurnCounterOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-
-    // Flame board center
-    final boardX = size.width / 2;
-    final boardY = size.height / 2.2;
-
-    // Counter size
     final diameter = size.width * 0.11;
-    final nudgeRight = size.width * 0.008;
+    final center = game.boardCenterOnScreen;
+    final double nudgeRight = size.width * 0.008; 
 
     return Stack(
       children: [
         Positioned(
-          left: boardX - (diameter / 2) + nudgeRight,
-          top: boardY - (diameter / 2),
+          left: center.x - (diameter / 2) + nudgeRight,
+          top: center.y - (diameter / 2),
           child: Container(
             width: diameter,
             height: diameter,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              
-              // Solid ARGB black to avoid hue shift
               color: const Color.fromARGB(140, 0, 0, 0),
-
-              // Crisp white border, no opacity
-              border: Border.all(
-                color: Colors.white,
-                width: 3.2,
-              ),
-
-              // No glow, no shadow
-              boxShadow: const [],
+              border: Border.all(color: Colors.white, width: 3.2),
             ),
             child: Text(
               "${game.failedTurns}",
