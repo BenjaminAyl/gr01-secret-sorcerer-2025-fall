@@ -91,12 +91,61 @@ class WizardGameView extends FlameGame with TapCallbacks {
       RectangleComponent(
         size: size,
         paint: Paint()..color = AppColors.primaryBrand,
-        priority: -10,
+        priority: -30,
+      ),
+    );
+    final bgSprite = await loadSprite('game-assets/board/background.png');
+
+    final screenW = size.x;
+    final screenH = size.y;
+
+    final imgW = bgSprite.srcSize.x;
+    final imgH = bgSprite.srcSize.y;
+
+    final imgRatio = imgW / imgH;
+    final screenRatio = screenW / screenH;
+
+    double finalW;
+    double finalH;
+
+    if (imgRatio > screenRatio) {
+      finalH = screenH;
+      finalW = finalH * imgRatio;
+    } else {
+      finalW = screenW;
+      finalH = finalW / imgRatio;
+    }
+
+    add(
+      SpriteComponent(
+        sprite: bgSprite,
+        size: Vector2(finalW, finalH),
+        anchor: Anchor.center,
+        position: Vector2(screenW / 2, screenH / 2),
+        priority: -25,
+      )..opacity = 0.12,
+    );
+    //vignette values 
+    add(
+      RectangleComponent(
+        size: size,
+        paint: Paint()
+          ..shader = RadialGradient(
+            colors: [
+              Colors.transparent,
+              Colors.black.withOpacity(0.45),
+            ],
+            stops: const [0.4, 1.0],
+            center: Alignment.center,
+            radius: 1.2,
+          ).createShader(Rect.fromLTWH(0, 0, size.x, size.y)),
+        priority: -20,
       ),
     );
 
     final boardSprite = await loadSprite('game-assets/board/baseboard.png');
     final boardSize = min(size.x, size.y) * 0.6;
+
     baseBoard = SpriteComponent(
       sprite: boardSprite,
       size: Vector2.all(boardSize),
@@ -104,8 +153,11 @@ class WizardGameView extends FlameGame with TapCallbacks {
       position: Vector2(size.x / 2, size.y / 2.2),
       priority: -3,
     );
+
     add(baseBoard!);
   }
+
+
 
   void _subscribeGameState() {
     FirebaseFirestore.instance
@@ -594,6 +646,11 @@ class WizardGameView extends FlameGame with TapCallbacks {
       _prevCurseLevel = 0;
     }
   }
+    Vector2 get boardCenterOnScreen {
+      if (baseBoard == null) return Vector2.zero();
+      return baseBoard!.position; // already screen-space aligned
+    }
+
 
   void _flashRing({required Color color}) {
     final ring = CircleComponent(
@@ -613,6 +670,9 @@ class WizardGameView extends FlameGame with TapCallbacks {
     );
   }
 }
+
+
+
 
 // PLAYER HAT CLASS
 class PlayerHatComponent extends SpriteComponent with TapCallbacks {
