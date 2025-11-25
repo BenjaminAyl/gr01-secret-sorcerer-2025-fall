@@ -81,10 +81,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   await userAuth.signIn(email: email, password: password);
 
                   if (!context.mounted) return;
-                  _showSnackBar(
-                    '✨ Welcome back, Sorcerer!',
-                    color: Colors.green,
-                  );
                   context.go('/home');
                 } on FirebaseAuthException catch (e) {
                   if (!context.mounted) return;

@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
-import 'package:secret_sorcerer/models/game_player.dart';
 
 class LobbyController {
   final FirebaseController _firebase = FirebaseController();
