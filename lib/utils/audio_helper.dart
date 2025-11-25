@@ -23,7 +23,7 @@ class AudioHelper {
       'hostJoin.wav',
       'paperRoll.mp3',
       'TavernThemeMusic.wav',
-      'deckDiscard.wav',
+      'drawDiscard.wav',
 
     ]);
 

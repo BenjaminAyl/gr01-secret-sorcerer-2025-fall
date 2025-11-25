@@ -137,7 +137,7 @@ class _DeckDiscardOverlayState extends State<DeckDiscardOverlay>
     required int count,
     required Color color,
   }) {
-    AudioHelper.playSFX("deckDiscard.wav");
+    AudioHelper.playSFX("drawDiscard.wav");
     for (int i = 0; i < count; i++) {
       final rune = _runes[Random().nextInt(_runes.length)];
       final start = _deckCenter!;
@@ -163,7 +163,7 @@ class _DeckDiscardOverlayState extends State<DeckDiscardOverlay>
     required int count,
     required Color color,
   }) {
-    AudioHelper.playSFX("deckDiscard.wav");
+    AudioHelper.playSFX("drawDiscard.wav");
     for (int i = 0; i < count; i++) {
       final rune = _runes[Random().nextInt(_runes.length)];
       final start = _discardCenter!;
