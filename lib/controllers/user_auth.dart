@@ -33,6 +33,7 @@ class UserAuth {
       'email': user.email ?? data['Email'] ?? data['email'] ?? '',
       'username': (data['Username'] ?? data['username'] ?? '').toString().toLowerCase(),
       'nickname': data['Nickname'] ?? data['nickname'] ?? '',
+      'hatColor': data['HatColor'] ?? data['hatColor'] ?? 'hatDefault',
     });
   }
 
@@ -113,7 +114,16 @@ class UserAuth {
     required String newUsername,
     required String oldUsername,
   }) async {
-    // TODO: implement username change logic
+    final bool check = await isUsernameAvailable(newUsername);
+    if (check) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      await usersDB.doc(user.uid).update({
+        "Username": newUsername,
+      });
+    } else {
+      throw Exception("Username is already taken");
+    }
   }
 
   /// Deletes the user's account and associated data.
@@ -121,5 +131,13 @@ class UserAuth {
   /// TODO: Implement delete account logic.
   Future<void> deleteAccount() async {
     // TODO: implement delete account logic
+  }
+
+  static Future<void> updateNickname(String newNickname) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    await usersDB.doc(user.uid).update({
+      "Nickname": newNickname,
+    });
   }
 }

@@ -1,7 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/controllers/firebase.dart';
+import 'package:secret_sorcerer/models/hats.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
 import 'package:secret_sorcerer/widgets/account/edit_nickname.dart';
 import 'package:secret_sorcerer/widgets/account/edit_password.dart';
@@ -20,6 +24,8 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   AppUser? _user;
+  String _hatColor = 'hatDefault';
+  final FirebaseController firebaseController = FirebaseController();
 
   @override
   void initState() {
@@ -32,7 +38,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final AppUser? currentUser = await userAuth.getCurrentUser();
     // TODO: update userAuth to use firestore to store current user
     if (!mounted) return;
-    setState(() => _user = currentUser);
+    setState(() {
+      _user = currentUser;
+      _hatColor = currentUser?.hatColor ?? 'hatDefault';
+      }
+    );
+  }
+
+  Future<void> _editHat() async {
+    showDialog<void>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        titleTextStyle: TextStyles.title,
+        backgroundColor: AppColors.primaryBrand,
+        title: const Text("Choose Hat Color"),
+        content: SizedBox(
+          width: double.minPositive,
+          child: GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+            ),
+            shrinkWrap: true,
+            itemCount: HatColors.values.length,
+            itemBuilder: (_, index) {
+              final color = HatColors.values[index];
+              return ListTile(
+                title: Image.asset('assets/images/hats/${hatColorToString(color)}.png',
+                  height: 50,
+                  width: 50,
+                ),
+                onTap: () async {
+                  await firebaseController.editHat(FirebaseAuth.instance.currentUser!.uid, hatColorToString(color));
+                  await _loadUser();
+                  Navigator.of(context).pop();
+                  },
+              );
+            },
+          ),
+        ),
+      );
+    },
+  );
+    
   }
 
   Future<void> _editNickname() async {
@@ -41,8 +91,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       builder: (_) => EditNicknameDialog(
         initial: _user?.nickname ?? '',
         save: (nickname) async {
-          // TODO: Implement nickname update logic later
-          return null; // returning null means "no error" for now
+          await UserAuth.updateNickname(nickname);
+          await _loadUser();
+          return null;
         },
       ),
     );
@@ -54,7 +105,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       builder: (_) => EditUsernameDialog(
         initial: _user?.username ?? '',
         save: (username) async {
-          // TODO: Implement username update logic later
+          await UserAuth().changeUsername(
+            newUsername: username,
+            oldUsername: _user?.username ?? '',
+          );
+          await _loadUser();
           return null;
         },
       ),
@@ -66,7 +121,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       context: context,
       builder: (_) => EditPasswordDialog(
         verifyCurrent: (currentPassword) async {
-          // TODO: Implement password verification later
           return true; // temporary success
         },
         changePassword: (newPassword) async {
@@ -115,13 +169,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                       Positioned(
+                        right: 40,
+                        top: -26,
+                        child: Image.asset('assets/images/hats/${_hatColor}.png',
+                          height: 50,
+                          width: 50,
+                          ),
+
+                      ),
+                      Positioned(
                         right: -18,
                         top: -10,
                         child: PillButton.small(
                           label: 'Edit',
-                          onPressed: () {
-                            // TODO: push avatar editor route
-                            // context.push('/profile/avatar');
+                          onPressed: () async {
+                            await _editHat();
                           },
                         ),
                       ),
