@@ -76,6 +76,12 @@ class FirebaseController {
   Future<void> joinLobby(String lobbyId, String playerId) async {
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
 
+    // Ensure lobby exists — update() will fail with 'No document to update' if it doesn't
+    final lobbySnap = await lobbyRef.get();
+    if (!lobbySnap.exists) {
+      throw Exception('LobbyNotFound');
+    }
+
     final userDoc = await _firestore.collection('users').doc(playerId).get();
     final userData = userDoc.data() ?? {};
     final nickname = userData['Nickname'] ?? 'Unknown'; //lowercase fix
@@ -149,6 +155,19 @@ class FirebaseController {
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchGame(String lobbyId) =>
       _firestore.collection('states').doc(lobbyId).snapshots();
+
+  /// Return the currentLobby id for the given user, or null if none.
+  Future<String?> getUserCurrentLobby(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      final data = doc.data() ?? {};
+      final lobby = data['currentLobby'];
+      if (lobby == null) return null;
+      return lobby.toString();
+    } catch (_) {
+      return null;
+    }
+  }
 
   //GAME ACTIONS (turn order etc)
   Future<void> updateHeadmaster(String lobbyId, int index, String uid) async {
@@ -889,8 +908,8 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
     final n = ids.length;
     final rng = Random();
 
-    // Shuffle for randomness
-    final shuffled = List<String>.from(ids)..shuffle();
+  // Shuffle for randomness using rng
+  final shuffled = List<String>.from(ids)..shuffle();
 
     late int numWarlocks;   // includes ArchWarlock inside
     late bool archSeesWarlocks;  
