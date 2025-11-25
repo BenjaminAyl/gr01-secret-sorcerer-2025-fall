@@ -64,7 +64,7 @@ class _JoinLobbyScreenState extends State<JoinLobbyScreen> {
             size: AppSpacing.iconSizeLarge,
           ),
           onPressed: () async {
-            AudioHelper.playSFX("back_button.wav");
+            AudioHelper.playSFX("backButton.wav");
             await Future.delayed(const Duration(milliseconds: 120));
             if (context.mounted) context.go('/home');
           },

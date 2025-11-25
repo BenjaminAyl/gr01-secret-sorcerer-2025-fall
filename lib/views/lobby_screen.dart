@@ -174,7 +174,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   size: AppSpacing.iconSizeLarge,
                 ),
                 onPressed: () async {
-                  AudioHelper.playSFX("back_button.wav");
+                  AudioHelper.playSFX("backButton.wav");
                   await Future.delayed(const Duration(milliseconds: 120));
                   await _leave(data);
                 },

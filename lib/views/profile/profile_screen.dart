@@ -5,8 +5,10 @@ import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
+import 'package:secret_sorcerer/utils/audio_helper.dart';
 import 'package:secret_sorcerer/widgets/buttons/back_nav_button.dart';
 import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
+import 'package:secret_sorcerer/widgets/dialogs/volume_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -41,6 +43,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: BackNavButtonSound(icon: Icons.cancel),
         centerTitle: true,
         title: const Text('Profile', style: TextStyles.heading),
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.volume_up,
+              color: AppColors.customAccent,
+              size: AppSpacing.iconSizeLarge,
+            ),
+            tooltip: 'Volume settings',
+            onPressed: () {
+              AudioHelper.playSFX("enterButton.wav");
+              showVolumeDialog(context);
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: Align(
@@ -83,7 +99,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onPressed: () async {
                     await userAuth.signOut();
                     if (!context.mounted) return;
-                    context.push('/'); 
+                    context.push('/');
                   },
                 ),
               ],
