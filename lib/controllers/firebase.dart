@@ -909,7 +909,7 @@ Future<void> confirmNextHeadmaster(String lobbyId) async {
     final rng = Random();
 
   // Shuffle for randomness using rng
-  final shuffled = List<String>.from(ids)..shuffle(rng);
+  final shuffled = List<String>.from(ids)..shuffle();
 
     late int numWarlocks;   // includes ArchWarlock inside
     late bool archSeesWarlocks;  
