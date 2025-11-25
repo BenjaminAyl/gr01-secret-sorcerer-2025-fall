@@ -10,6 +10,8 @@ class InfoRow extends StatelessWidget {
   final String? actionLabel;     // made optional
   final Color? actionColor;
   final VoidCallback? onPress;   // made optional
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryPress;
 
   const InfoRow({
     super.key,
@@ -18,12 +20,15 @@ class InfoRow extends StatelessWidget {
     this.onPress,
     this.actionLabel,
     this.actionColor,
+    this.secondaryActionLabel,
+    this.onSecondaryPress,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasValue = (value != null && value!.trim().isNotEmpty);
-    final hasButton = onPress != null;
+  final hasButton = onPress != null;
+  final hasSecondary = onSecondaryPress != null;
 
     return Row(
       children: [
@@ -48,11 +53,26 @@ class InfoRow extends StatelessWidget {
           ),
         ),
 
-        if (hasButton) ...[
+        if (hasButton || hasSecondary) ...[
           AppSpacing.gapWL,
-          PillButton.small(
-            label: actionLabel ?? 'Edit',
-            onPressed: onPress!,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 5,
+            children: [
+              if (hasSecondary) ...[
+                PillButton.small(
+                  label: secondaryActionLabel ?? 'Join',
+                  onPressed: onSecondaryPress!,
+                ),
+                AppSpacing.gapS,
+              ],
+              if (hasButton) ...[
+                PillButton.small(
+                  label: actionLabel ?? 'Edit',
+                  onPressed: onPress!,
+                ),
+              ],
+            ],
           ),
         ],
       ],
