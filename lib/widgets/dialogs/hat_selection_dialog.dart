@@ -5,7 +5,7 @@ import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/models/hats.dart';
 
 class HatSelectionDialog extends StatefulWidget {
-  final String currentHatColor; // starting hat
+  final String currentHatColor;
 
   const HatSelectionDialog({super.key, required this.currentHatColor});
 
@@ -14,7 +14,7 @@ class HatSelectionDialog extends StatefulWidget {
 }
 
 class _HatSelectionDialogState extends State<HatSelectionDialog> {
-  late String _previewHat; // current hat being "tried on"
+  late String _previewHat;
 
   @override
   void initState() {
@@ -26,20 +26,36 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.primaryBrand,
+      alignment: Alignment.center,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
       ),
-      titleTextStyle: TextStyles.title,
-      title: const Text('Choose Hat'),
+
+      // Centered title
+      titlePadding: const EdgeInsets.only(top: 16),
+      title: Center(
+        child: Text(
+          'Choose Hat',
+          style: TextStyles.title,
+          textAlign: TextAlign.center,
+        ),
+      ),
+
+      contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+
       content: SizedBox(
-        width: double.minPositive,
+        width: 340, // wider dialog so grid/text aren't squeezed
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Gap at the top above the avatar
+            const SizedBox(height: 20),
+
             // Avatar + hat preview
             SizedBox(
               width: 220,
-              height: 200,
+              height: 180,
               child: Stack(
                 alignment: Alignment.center,
                 clipBehavior: Clip.none,
@@ -65,17 +81,18 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
               ),
             ),
 
-            const SizedBox(height: 8),
+            // Small gap below avatar before text
+            const SizedBox(height: 4),
 
             Text(
-              'Try on different hats before choosing one.',
+              'Try on different hats then press "OK"',
               style: TextStyles.body.copyWith(
                 color: Colors.white.withOpacity(0.8),
               ),
               textAlign: TextAlign.center,
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
 
             // Hat grid
             GridView.builder(
@@ -83,8 +100,8 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
               ),
               itemCount: HatColors.values.length,
               itemBuilder: (context, index) {
@@ -103,7 +120,7 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppColors.secondaryBrand.withOpacity(0.2)
-                          : Colors.black.withOpacity(0.1),
+                          : Colors.white.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(
                         AppSpacing.radiusCard,
                       ),
@@ -126,14 +143,27 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
           ],
         ),
       ),
+
+      // Centered Cancel / OK buttons
+      actionsAlignment: MainAxisAlignment.center,
+      actionsPadding: const EdgeInsets.only(bottom: 12, top: 4),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(
+              color: AppColors.textAccentSecondary,
+              fontSize: 16,
+            ),
+          ),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(_previewHat),
-          child: const Text('OK', style: TextStyle(color: Colors.white)),
+          child: const Text(
+            'OK',
+            style: TextStyle(color: AppColors.textAccent, fontSize: 16),
+          ),
         ),
       ],
     );

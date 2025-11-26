@@ -111,7 +111,7 @@ class _ProfileCustomizationDialogState
 
             Column(
               children: [
-                PillButton.small(label: 'Choose hat', onPressed: _chooseHat),
+                PillButton.small(label: 'Change hat', onPressed: _chooseHat),
                 const SizedBox(height: 10),
                 PillButton.small(
                   label: 'Change profile picture',
