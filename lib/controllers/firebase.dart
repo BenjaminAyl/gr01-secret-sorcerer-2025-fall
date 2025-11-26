@@ -346,7 +346,12 @@ class FirebaseController {
       'phase': 'auto_warning',
       'notif': "Chaotic Magic Surges...",
     });
-    await Future.delayed(const Duration(milliseconds: 3000)); //change this to prolong animation
+
+    await Future.delayed(const Duration(milliseconds: 3000));
+
+    String? execPowerToTrigger;
+    List<String> peekCards = [];
+
     await _firestore.runTransaction((tx) async {
       final snap = await tx.get(ref);
       if (!snap.exists) return;
@@ -357,24 +362,75 @@ class FirebaseController {
 
       int charms = data['charms'] ?? 0;
       int curses = data['curses'] ?? 0;
+      final playersCount = (data['players'] as List).length;
 
-      // Reset fail count first
+      // Reset failed turns
       tx.update(ref, {'failedTurns': 0});
-      final top = deck.removeAt(0);
-      discard.add(top);
-      if (top == 'charm') charms++;
-      if (top == 'curse') curses++;
 
+      if (deck.isEmpty) return;
+
+      final top = deck.removeAt(0);
+      if (top == 'charm') {
+        charms++;
+      } else if (top == 'curse') {
+        curses++;
+      }
+      String? exec;
+      if (top == 'curse') {
+        exec = _executivePowerFor(playersCount, curses);
+      }
+
+      if (exec != null) {
+        execPowerToTrigger = exec;
+
+        if (exec == "peek3") {
+          if (deck.length >= 3) {
+            peekCards = List<String>.from(deck.sublist(0, 3));
+          }
+        }
+
+        tx.update(ref, {
+          'deck': deck,
+          'discard': discard,
+          'charms': charms,
+          'curses': curses,
+          'pendingCards': [],
+          'pendingOwner': null,
+          'executivePower': exec,
+          'executiveActive': true,
+          'phase': exec == "investigate"
+              ? 'executive_investigate'
+              : exec == "peek3"
+                  ? 'executive_peek3'
+                  : exec == "choose_next_hm"
+                      ? 'executive_choose_hm'
+                      : exec == "kill"
+                          ? 'executive_kill'
+                          : 'resolving',
+          if (exec == "peek3") 'pendingExecutiveCards': peekCards,
+        });
+        return;
+      }
       tx.update(ref, {
         'deck': deck,
         'discard': discard,
         'charms': charms,
         'curses': curses,
+        'pendingCards': [],
+        'pendingOwner': null,
         'phase': 'resolving',
       });
     });
+
+    // If we triggered an executive event, DO NOT rotate HM
+    if (execPowerToTrigger != null) {
+      return;
+    }
+
+    // Otherwise continue normal flow
     await _rotateHeadmaster(lobbyId);
   }
+
 
 
   Future<void> _rotateHeadmaster(String lobbyId) async {
@@ -575,10 +631,10 @@ class FirebaseController {
   String? _executivePowerFor(int players, int curses) {
 
     //TESTING: enable executive powers for small test games
-    // if (players < 5) { 
-    // if (curses == 1) return 'kill'; //not meant to play with under 5
-    // return null;
-    // }
+    if (players < 5) { 
+    if (curses == 1) return 'choose_next_hm'; //not meant to play with under 5
+     return null;
+     }
 
     //real game
     // 5–6 players
@@ -643,36 +699,39 @@ Future<void> chooseNextHeadmaster(String lobbyId, String targetUid) async {
   });
 }
 
-Future<void> confirmNextHeadmaster(String lobbyId) async {
-  final ref = _firestore.collection('states').doc(lobbyId);
+  Future<void> confirmNextHeadmaster(String lobbyId) async {
+    final ref = _firestore.collection('states').doc(lobbyId);
 
-  await _firestore.runTransaction((tx) async {
-    final snap = await tx.get(ref);
-    if (!snap.exists) return;
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
 
-    final data = snap.data()!;
-    final players = (data['players'] as List).cast<Map<String, dynamic>>();
-    final targetUid = data['overrideHM'];
+      final data = snap.data()!;
+      final players = (data['players'] as List).cast<Map<String, dynamic>>();
+      final targetUid = data['overrideHM'];
 
-    if (targetUid == null) return;
+      if (targetUid == null) return;
 
-    final newIndex = players.indexWhere((p) => p['username'] == targetUid);
-    if (newIndex < 0) return;
+      final newIndex = players.indexWhere((p) => p['username'] == targetUid);
+      if (newIndex < 0) return;
+      final previousHM = data['headmaster'];
+      final previousSC = data['spellcaster'];
 
-    tx.update(ref, {
-      'headmasterIdx': newIndex,
-      'headmaster': targetUid,
-      'spellcaster': null,
-      'executivePower': null,
-      'executiveActive': false,
-      'executiveTarget': null,
-      'pendingExecutiveCards': [],
-      'phase': 'start',
+      tx.update(ref, {
+        'headmasterIdx': newIndex,
+        'headmaster': targetUid,
+        'spellcaster': null,
+        'lastHeadmaster': previousHM,
+        'lastSpellcaster': previousSC,
+        'executivePower': null,
+        'executiveActive': false,
+        'executiveTarget': null,
+        'pendingExecutiveCards': [],
+        'phase': 'start',
+      });
     });
-  });
+  }
 
-  await _drawForHeadmaster(lobbyId);
-}
 
   Future<void> selectKillTarget(String lobbyId, String targetUid) async {
     final ref = _firestore.collection('states').doc(lobbyId);

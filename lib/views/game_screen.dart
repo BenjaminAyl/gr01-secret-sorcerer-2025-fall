@@ -1,3 +1,5 @@
+
+
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,7 +20,6 @@ import 'package:secret_sorcerer/views/overlays/turn_counter_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/auto_warning_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/game_win_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/deck_discard_overlay.dart';
-
 
 class GameScreen extends StatefulWidget {
   final String code;
@@ -112,6 +113,7 @@ class _GameScreenState extends State<GameScreen>
               _myVoteCastLocal = false;
             }
 
+            // AUTO WARNING
             if (_game.phase == 'auto_warning') {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!_game.overlays.isActive('auto_warning')) {
@@ -121,35 +123,44 @@ class _GameScreenState extends State<GameScreen>
             } else {
               _game.overlays.remove('auto_warning');
             }
+
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!_game.overlays.isActive('turn_counter')) {
                 _game.overlays.add('turn_counter');
               }
             });
+
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!_game.overlays.isActive('deck_discard')) {
                 _game.overlays.add('deck_discard');
               }
             });
+
             final winnerTeam = rawState['winnerTeam'];
             final bool isGameOver =
                 _game.phase == 'game_over' && winnerTeam != null;
 
             return Scaffold(
               backgroundColor: AppColors.primaryBrand,
-              body: SafeArea(
-                child: Stack(
-                  children: [
-                    GameWidget(
+
+               body: Stack(
+                children: [
+                  Positioned.fill(
+                    child: GameWidget(
                       game: _game,
                       overlayBuilderMap: {
                         'auto_warning': (context, game) =>
-                            const AutoWarningOverlay(),
-                        'turn_counter': (context, game) =>
-                            TurnCounterOverlay(game: game as WizardGameView),
-                        'deck_discard': (context, game) =>
-                            DeckDiscardOverlay(game: game as WizardGameView),
+                            const SafeArea(child: AutoWarningOverlay()),
 
+                        'turn_counter': (context, game) => SafeArea(
+                            child: TurnCounterOverlay(
+                                game: game as WizardGameView)),
+                        
+                        'deck_discard': (context, game) => SafeArea(
+                            child: DeckDiscardOverlay(
+                                game: game as WizardGameView)),
+
+                        // MAIN HUD
                         'ControlsOverlay': (context, game) {
                           final g = game as WizardGameView;
                           final isHM = g.isHeadmasterClient;
@@ -168,10 +179,12 @@ class _GameScreenState extends State<GameScreen>
                               g.pendingCards.length == 2;
 
                           final showVoting =
-                            (!isHM && g.phase == 'voting' && !isDead) ||
-                            (g.phase == 'voting_results');
+                              (!isHM &&
+                                      g.phase == 'voting' &&
+                                      !isDead) ||
+                                  (g.phase == 'voting_results');
 
-
+                          // HUD
                           Widget topHUD = Column(
                             children: [
                               SizedBox(height: height * 0.012),
@@ -181,7 +194,8 @@ class _GameScreenState extends State<GameScreen>
                                   vertical: height * 0.01,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.secondaryBrand.withOpacity(0.75),
+                                  color: AppColors.secondaryBrand
+                                      .withOpacity(0.75),
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: Text(
@@ -209,119 +223,132 @@ class _GameScreenState extends State<GameScreen>
 
                           final bool showScroll =
                               !showHMDiscard &&
-                              !showSCChoose &&
-                              !showVoting &&
-                              g.phase != 'executive_investigate' &&
-                              g.phase != 'executive_investigate_result' &&
-                              g.phase != 'executive_peek3' &&
-                              g.phase != 'executive_choose_hm' &&
-                              g.phase != 'executive_choose_hm_result' &&
-                              g.phase != 'executive_kill' &&
-                              g.phase != 'executive_kill_result' &&
-                              g.phase != 'executive_kill_result_arch' &&
-                              !isDead &&
-                              g.phase != 'auto_warning';
+                                  !showSCChoose &&
+                                  !showVoting &&
+                                  g.phase != 'executive_investigate' &&
+                                  g.phase != 'executive_investigate_result' &&
+                                  g.phase != 'executive_peek3' &&
+                                  g.phase != 'executive_choose_hm' &&
+                                  g.phase != 'executive_choose_hm_result' &&
+                                  g.phase != 'executive_kill' &&
+                                  g.phase != 'executive_kill_result' &&
+                                  g.phase != 'executive_kill_result_arch' &&
+                                  !isDead &&
+                                  g.phase != 'auto_warning';
 
-                          return Stack(
-                            children: [
-                              // Unified BACK button (host + client)
-                            Positioned(
-                              top: height * 0.015,
-                              left: width * 0.02,
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.arrow_back_ios_new,
-                                  color: Colors.white,
-                                ),
-                                onPressed: () async {
-                                  if (isHost) {
-                                    // Host flow
-                                    final ok = await _confirmEndGame(context);
-                                    if (ok == true) {
-                                      await FirebaseFirestore.instance
-                                          .collection('states')
-                                          .doc(widget.code)
-                                          .delete();
-                                      await _firebase.resetLobby(widget.code);
-                                    }
-                                  } else {
-                                    // Client flow
-                                    final ok = await _confirmLeaveGame(context);
-                                    if (ok == true) {
-                                      await _firebase.clientTerminateGame(widget.code);
-                                    }
-                                  }
-                                },
-                              ),
-                            ),
-
-
-
-                              Align(
-                                alignment: Alignment.topCenter,
-                                child: topHUD,
-                              ),
-
-                              if (showHMDiscard)
-                                PolicyOverlay(
-                                  game: g,
-                                  height: height,
-                                  width: width,
-                                  isHMPhase: true,
-                                ),
-
-                              if (showSCChoose)
-                                PolicyOverlay(
-                                  game: g,
-                                  height: height,
-                                  width: width,
-                                  isHMPhase: false,
-                                ),
-
-                              if (showVoting)
-                                VotingOverlay(
-                                  game: g,
-                                  height: height,
-                                  width: width,
-                                  myVoteCastLocal: _myVoteCastLocal,
-                                  onVote: (yes) async {
-                                    if (_myVoteCastLocal ||
-                                        g.iVoted) return;
-                                    setState(() {
-                                      _myVoteCastLocal = true;
-                                    });
-                                    await g.castVote(yes);
-                                  },
-                                ),
-
-                              Positioned.fill(
-                                child: _buildExecutiveStack(
-                                  g,
-                                  width,
-                                  height,
-                                  isHM,
-                                  isHost,
-                                ),
-                              ),
-
-                              if (showScroll)
-                                Align(
-                                  alignment: Alignment.bottomCenter,
-                                  child: RoleScrollOverlay(
-                                    game: g,
-                                    myUid: _uid!,
-                                    height: height,
-                                    width: width,
+                          return SafeArea(
+                            child: Stack(
+                              children: [
+                                // BACK BUTTON
+                                Positioned(
+                                  top: height * 0.015,
+                                  left: width * 0.02,
+                                  child: IconButton(
+                                    icon: const Icon(
+                                      Icons.arrow_back_ios_new,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: () async {
+                                      if (isHost) {
+                                        final ok =
+                                            await _confirmEndGame(context);
+                                        if (ok == true) {
+                                          await FirebaseFirestore.instance
+                                              .collection('states')
+                                              .doc(widget.code)
+                                              .delete();
+                                          await _firebase.resetLobby(
+                                              widget.code);
+                                        }
+                                      } else {
+                                        final ok =
+                                            await _confirmLeaveGame(context);
+                                        if (ok == true) {
+                                          await _firebase.clientTerminateGame(
+                                              widget.code);
+                                        }
+                                      }
+                                    },
                                   ),
                                 ),
-                            ],
+
+                                Align(
+                                  alignment: Alignment.topCenter,
+                                  child: topHUD,
+                                ),
+
+                                if (showHMDiscard)
+                                  PolicyOverlay(
+                                    game: g,
+                                    height: height,
+                                    width: width,
+                                    isHMPhase: true,
+                                  ),
+
+                                if (showSCChoose)
+                                  PolicyOverlay(
+                                    game: g,
+                                    height: height,
+                                    width: width,
+                                    isHMPhase: false,
+                                  ),
+
+                                if (showVoting)
+                                  VotingOverlay(
+                                    game: g,
+                                    height: height,
+                                    width: width,
+                                    myVoteCastLocal: _myVoteCastLocal,
+                                    onVote: (yes) async {
+                                      if (_myVoteCastLocal ||
+                                          g.iVoted) return;
+                                      setState(() {
+                                        _myVoteCastLocal = true;
+                                      });
+                                      await g.castVote(yes);
+                                    },
+                                  ),
+
+                                Positioned.fill(
+                                  child: _buildExecutiveStack(
+                                    g,
+                                    width,
+                                    height,
+                                    isHM,
+                                    isHost,
+                                  ),
+                                ),
+
+                                if (showScroll)
+                                  Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: RoleScrollOverlay(
+                                      game: g,
+                                      myUid: _uid!,
+                                      height: height,
+                                      width: width,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           );
                         }
                       },
                     ),
+                  ),
 
-                    if (isGameOver)
-                      Positioned.fill(
+                  // Auto warning overlay
+                  if (_game.overlays.isActive('auto_warning'))
+                    const Positioned.fill(
+                      child: IgnorePointer(
+                        child: SafeArea(child: AutoWarningOverlay()),
+                      ),
+                    ),
+
+                  // GAME OVER
+                  if (isGameOver)
+                    Positioned.fill(
+                      child: SafeArea(
                         child: GameWinOverlay(
                           game: _game,
                           width: width,
@@ -334,14 +361,13 @@ class _GameScreenState extends State<GameScreen>
                                       .collection('states')
                                       .doc(widget.code)
                                       .delete();
-                                  await _firebase.resetLobby(
-                                      widget.code);
+                                  await _firebase.resetLobby(widget.code);
                                 }
                               : null,
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
             );
           },
@@ -374,7 +400,8 @@ class _GameScreenState extends State<GameScreen>
       ),
     );
   }
-    Future<bool?> _confirmLeaveGame(BuildContext context) {
+
+  Future<bool?> _confirmLeaveGame(BuildContext context) {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -398,7 +425,6 @@ class _GameScreenState extends State<GameScreen>
       ),
     );
   }
-
 
   Widget _buildExecutiveStack(
     WizardGameView g,
@@ -459,8 +485,8 @@ class _GameScreenState extends State<GameScreen>
             game: g,
             height: height,
             width: width,
-            isArch: g.phase ==
-                'executive_kill_result_arch',
+            isArch:
+                g.phase == 'executive_kill_result_arch',
             isHost: isHost,
             onContinue: isHost
                 ? () async {
