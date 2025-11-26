@@ -3,6 +3,7 @@ class AppUser {
   final String email;
   final String username;
   final String nickname;
+  final String hatColor;
   final int wins;
   final int losses;
 
@@ -13,6 +14,7 @@ class AppUser {
     required this.nickname,
     this.wins = 0,
     this.losses = 0,
+    this.hatColor = 'hatDefault',
   });
 
   factory AppUser.fromMap(Map data) {
@@ -21,7 +23,12 @@ class AppUser {
       email: data['email'] ?? '',
       username: data['username'] ?? '',
       nickname: data['nickname'] ?? '',
+      hatColor: data['hatColor'] ?? 'hatDefault',
+      wins: data['wins'] ?? 0,
+      losses: data['losses'] ?? 0,
     );
+  
+
   }
 
   Map<String, dynamic> toMap() => {

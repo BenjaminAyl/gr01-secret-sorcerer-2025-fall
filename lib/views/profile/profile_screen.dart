@@ -20,6 +20,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   AppUser? _user;
   final userAuth = UserAuth();
+  String _hatColor = 'hatDefault';
 
   @override
   void initState() {
@@ -29,7 +30,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUser() async {
     final currentUser = await userAuth.getCurrentUser();
-    setState(() => _user = currentUser);
+    setState(() {
+      _user = currentUser;
+      _hatColor = currentUser?.hatColor ?? 'hatDefault';
+      });
   }
 
   @override
@@ -67,13 +71,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AppSpacing.gapM,
-                const CircleAvatar(
-                  radius: AppSpacing.avatarMedium,
-                  backgroundColor: AppColors.secondaryBrand,
-                  child: Icon(
-                    Icons.person,
-                    size: AppSpacing.iconSizeLarge,
-                    color: Colors.white,
+                SizedBox(
+                  height: 140,   // give enough room for hat + avatar
+                  child: Stack(
+                    clipBehavior: Clip.none,   // important
+                    children: [
+                      Positioned(
+                        top: 40,  // Move avatar down
+                        left: 0,
+                        right: 0,
+                        child: CircleAvatar(
+                          radius: AppSpacing.avatarMedium,
+                          backgroundColor: AppColors.secondaryBrand,
+                          child: Icon(
+                            Icons.person,
+                            size: AppSpacing.iconSizeLarge,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+
+                      Positioned(
+                        top: 0,  // hat sits above the avatar now
+                        left: 0,
+                        right: 0,
+                        child: Image.asset(
+                          'assets/images/hats/$_hatColor.png',
+                          height: 50,
+                          width: 50,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 AppSpacing.gapM,
