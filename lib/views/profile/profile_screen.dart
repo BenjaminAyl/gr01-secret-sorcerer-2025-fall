@@ -30,16 +30,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUser() async {
     final currentUser = await userAuth.getCurrentUser();
+    if (!mounted) return;
     setState(() {
       _user = currentUser;
       _hatColor = currentUser?.hatColor ?? 'hatDefault';
-      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final nickname = _user?.nickname ?? '';
     final username = '@${_user?.username ?? ''}';
+
     return Scaffold(
       backgroundColor: AppColors.secondaryBG,
       appBar: AppBar(
@@ -71,13 +73,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AppSpacing.gapM,
+
+                // Avatar + hat preview (same styling as EditProfileScreen but no big gap under)
+                // Avatar + hat preview (tight spacing, hat always on top)
                 SizedBox(
-                  height: 140,   // give enough room for hat + avatar
+                  width: 220,
+                  height: 160, // reduced from 170 to tighten layout
                   child: Stack(
-                    clipBehavior: Clip.none,   // important
+                    clipBehavior: Clip.none,
                     children: [
-                      Positioned(
-                        top: 40,  // Move avatar down
+                      // Avatar at bottom center
+                      const Positioned(
+                        bottom: 0,
                         left: 0,
                         right: 0,
                         child: CircleAvatar(
@@ -85,26 +92,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           backgroundColor: AppColors.secondaryBrand,
                           child: Icon(
                             Icons.person,
-                            size: AppSpacing.iconSizeLarge,
+                            size: AppSpacing.avatarMedium,
                             color: Colors.white,
                           ),
                         ),
                       ),
 
+                      // 🔥 Hat painted AFTER avatar = always on top
                       Positioned(
-                        top: 0,  // hat sits above the avatar now
+                        bottom: AppSpacing.avatarMedium + 18,
                         left: 0,
                         right: 0,
                         child: Image.asset(
                           'assets/images/hats/$_hatColor.png',
-                          height: 50,
-                          width: 50,
+                          height: AppSpacing.hatHeightLarge,
+                          width: AppSpacing.hatWidthLarge,
                         ),
                       ),
                     ],
                   ),
                 ),
-                AppSpacing.gapM,
+
+                AppSpacing.gapS,
 
                 // User name + username
                 Text(nickname, style: TextStyles.bodyLarge),
@@ -112,14 +121,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(username, style: TextStyles.body),
 
                 AppSpacing.gapXXL,
+
                 PrimaryButton(
                   label: 'Edit Profile',
-                  onPressed: () => context.push('/profile/edit'),
+                  onPressed: () async {
+                    await context.push('/profile/edit');
+                    await _loadUser(); // refresh hat and other info on return
+                  },
                 ),
                 AppSpacing.buttonSpacing,
                 PrimaryButton(
                   label: 'Manage Friends',
-                  onPressed: () => context.push('/profile/friends'),
+                  onPressed: () async {
+                    await context.push('/profile/friends');
+                    await _loadUser();
+                  },
                 ),
                 AppSpacing.buttonSpacing,
                 PrimaryButton(

@@ -48,6 +48,9 @@ class AppSpacing {
   static const double iconSizeMedium = 32;
   static const double iconSizeLarge = 48;
 
+  static const double hatHeightLarge = 96;
+  static const double hatWidthLarge = 96;
+
   // Radius sizing
   static const double radiusXS = 6;
   static const double radiusS = 8;
