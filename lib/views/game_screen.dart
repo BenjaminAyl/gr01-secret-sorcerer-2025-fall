@@ -1,14 +1,18 @@
+
+
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/views/game_view.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
+
 import 'package:secret_sorcerer/views/overlays/game_notification_bar.dart';
 import 'package:secret_sorcerer/views/overlays/role_scroll_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/policy_overlay.dart';
@@ -19,7 +23,6 @@ import 'package:secret_sorcerer/views/overlays/auto_warning_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/game_win_overlay.dart';
 import 'package:secret_sorcerer/views/overlays/deck_discard_overlay.dart';
 
-
 class GameScreen extends StatefulWidget {
   final String code;
   const GameScreen({super.key, required this.code});
@@ -28,14 +31,14 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen>
-    with TickerProviderStateMixin {
+class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   final _firebase = FirebaseController();
   late final WizardGameView _game;
+
   String? _creatorId;
   String? _uid;
-  bool _navigatedOut = false;
 
+  bool _navigatedOut = false;
   bool _myVoteCastLocal = false;
 
   @override
@@ -53,13 +56,8 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   Widget build(BuildContext context) {
-    final lobbyRef = FirebaseFirestore.instance
-        .collection('lobbies')
-        .doc(widget.code);
-
-    final stateRef = FirebaseFirestore.instance
-        .collection('states')
-        .doc(widget.code);
+    final lobbyRef = FirebaseFirestore.instance.collection('lobbies').doc(widget.code);
+    final stateRef = FirebaseFirestore.instance.collection('states').doc(widget.code);
 
     final size = MediaQuery.of(context).size;
     final width = size.width;
@@ -69,9 +67,7 @@ class _GameScreenState extends State<GameScreen>
       stream: lobbyRef.snapshots(),
       builder: (context, lobbySnap) {
         if (!lobbySnap.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
         _creatorId ??= lobbySnap.data!.data()?['creatorId'];
@@ -80,12 +76,10 @@ class _GameScreenState extends State<GameScreen>
           stream: stateRef.snapshots(),
           builder: (context, stateSnap) {
             if (!stateSnap.hasData) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
             }
 
-            // If the state was deleted -> return to lobby
+            // If state deleted then return to lobby
             if (!stateSnap.data!.exists) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!_navigatedOut) {
@@ -99,19 +93,18 @@ class _GameScreenState extends State<GameScreen>
             final rawState = stateSnap.data!.data();
             if (rawState == null) return const SizedBox.shrink();
 
-            // Assign live state fields
+            // Sync live fields
             _game.phase = rawState['phase'] ?? 'start';
             _game.executivePower = rawState['executivePower'];
             _game.executiveActive = rawState['executiveActive'] == true;
             _game.executiveTarget = rawState['executiveTarget'];
-            _game.pendingExecutiveCards =
-                List<String>.from(rawState['pendingExecutiveCards'] ?? []);
+            _game.pendingExecutiveCards = List<String>.from(rawState['pendingExecutiveCards'] ?? []);
 
-            if (_game.phase != 'voting' &&
-                _game.phase != 'voting_results') {
+            if (_game.phase != 'voting' && _game.phase != 'voting_results') {
               _myVoteCastLocal = false;
             }
 
+            // Auto-warning overlay activation
             if (_game.phase == 'auto_warning') {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!_game.overlays.isActive('auto_warning')) {
@@ -121,35 +114,44 @@ class _GameScreenState extends State<GameScreen>
             } else {
               _game.overlays.remove('auto_warning');
             }
+
+            // Always turn counter
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!_game.overlays.isActive('turn_counter')) {
                 _game.overlays.add('turn_counter');
               }
             });
+
+            // Always deck overlay
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!_game.overlays.isActive('deck_discard')) {
                 _game.overlays.add('deck_discard');
               }
             });
+
             final winnerTeam = rawState['winnerTeam'];
-            final bool isGameOver =
-                _game.phase == 'game_over' && winnerTeam != null;
+            final isGameOver = _game.phase == 'game_over' && winnerTeam != null;
 
             return Scaffold(
               backgroundColor: AppColors.primaryBrand,
-              body: SafeArea(
-                child: Stack(
-                  children: [
-                    GameWidget(
+              body: Stack(
+                children: [
+                  Positioned.fill(
+                    child: GameWidget(
                       game: _game,
                       overlayBuilderMap: {
-                        'auto_warning': (context, game) =>
-                            const AutoWarningOverlay(),
+                        // FULLSCREEN NOW
+                        'auto_warning': (context, game) => const AutoWarningOverlay(),
+
+                        //FULLSCREEN NOW
                         'turn_counter': (context, game) =>
                             TurnCounterOverlay(game: game as WizardGameView),
-                        'deck_discard': (context, game) =>
-                            DeckDiscardOverlay(game: game as WizardGameView),
 
+                        // Leave deck overlay
+                        'deck_discard': (context, game) =>
+                            SafeArea(child: DeckDiscardOverlay(game: game as WizardGameView)),
+
+                        // HUD
                         'ControlsOverlay': (context, game) {
                           final g = game as WizardGameView;
                           final isHM = g.isHeadmasterClient;
@@ -157,20 +159,10 @@ class _GameScreenState extends State<GameScreen>
                           final isDead = g.dead[_uid] == true;
                           final isHost = _uid == _creatorId;
 
-                          final showHMDiscard =
-                              isHM &&
-                              g.phase == 'hm_discard' &&
-                              g.pendingCards.length == 3;
-
-                          final showSCChoose =
-                              isSC &&
-                              g.phase == 'sc_choose' &&
-                              g.pendingCards.length == 2;
-
-                          final showVoting =
-                            (!isHM && g.phase == 'voting' && !isDead) ||
-                            (g.phase == 'voting_results');
-
+                          final showHMDiscard = isHM && g.phase == 'hm_discard' && g.pendingCards.length == 3;
+                          final showSCChoose = isSC && g.phase == 'sc_choose' && g.pendingCards.length == 2;
+                          final showVoting = (!isHM && g.phase == 'voting' && !isDead) ||
+                              (g.phase == 'voting_results');
 
                           Widget topHUD = Column(
                             children: [
@@ -209,91 +201,81 @@ class _GameScreenState extends State<GameScreen>
 
                           final bool showScroll =
                               !showHMDiscard &&
-                              !showSCChoose &&
-                              !showVoting &&
-                              g.phase != 'executive_investigate' &&
-                              g.phase != 'executive_investigate_result' &&
-                              g.phase != 'executive_peek3' &&
-                              g.phase != 'executive_choose_hm' &&
-                              g.phase != 'executive_choose_hm_result' &&
-                              g.phase != 'executive_kill' &&
-                              g.phase != 'executive_kill_result' &&
-                              g.phase != 'executive_kill_result_arch' &&
-                              !isDead &&
-                              g.phase != 'auto_warning';
+                                  !showSCChoose &&
+                                  !showVoting &&
+                                  g.phase != 'executive_investigate' &&
+                                  g.phase != 'executive_investigate_result' &&
+                                  g.phase != 'executive_peek3' &&
+                                  g.phase != 'executive_choose_hm' &&
+                                  g.phase != 'executive_choose_hm_result' &&
+                                  g.phase != 'executive_kill' &&
+                                  g.phase != 'executive_kill_result' &&
+                                  g.phase != 'executive_kill_result_arch' &&
+                                  !isDead &&
+                                  g.phase != 'auto_warning';
 
                           return Stack(
                             children: [
-                              // Unified BACK button (host + client)
-                            Positioned(
-                              top: height * 0.015,
-                              left: width * 0.02,
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.arrow_back_ios_new,
-                                  color: Colors.white,
+                              // Back button
+                              Positioned(
+                                top: height * 0.015,
+                                left: width * 0.02,
+                                child: IconButton(
+                                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                                  onPressed: () async {
+                                    if (isHost) {
+                                      final ok = await _confirmEndGame(context);
+                                      if (ok == true) {
+                                        await FirebaseFirestore.instance
+                                            .collection('states')
+                                            .doc(widget.code)
+                                            .delete();
+                                        await _firebase.resetLobby(widget.code);
+                                      }
+                                    } else {
+                                      final ok = await _confirmLeaveGame(context);
+                                      if (ok == true) {
+                                        await _firebase.clientTerminateGame(widget.code);
+                                      }
+                                    }
+                                  },
                                 ),
-                                onPressed: () async {
-                                  if (isHost) {
-                                    // Host flow
-                                    final ok = await _confirmEndGame(context);
-                                    if (ok == true) {
-                                      await FirebaseFirestore.instance
-                                          .collection('states')
-                                          .doc(widget.code)
-                                          .delete();
-                                      await _firebase.resetLobby(widget.code);
-                                    }
-                                  } else {
-                                    // Client flow
-                                    final ok = await _confirmLeaveGame(context);
-                                    if (ok == true) {
-                                      await _firebase.clientTerminateGame(widget.code);
-                                    }
-                                  }
-                                },
-                              ),
-                            ),
-
-
-
-                              Align(
-                                alignment: Alignment.topCenter,
-                                child: topHUD,
                               ),
 
+                              Align(alignment: Alignment.topCenter, child: topHUD),
+
+                              // FULLSCREEN POLICY
                               if (showHMDiscard)
-                                PolicyOverlay(
-                                  game: g,
-                                  height: height,
-                                  width: width,
-                                  isHMPhase: true,
+                                Positioned.fill(
+                                  child: PolicyOverlay(
+                                      game: g, height: height, width: width, isHMPhase: true),
                                 ),
 
                               if (showSCChoose)
-                                PolicyOverlay(
-                                  game: g,
-                                  height: height,
-                                  width: width,
-                                  isHMPhase: false,
+                                Positioned.fill(
+                                  child: PolicyOverlay(
+                                      game: g, height: height, width: width, isHMPhase: false),
                                 ),
 
+                              // FULLSCREEN VOTING
                               if (showVoting)
-                                VotingOverlay(
-                                  game: g,
-                                  height: height,
-                                  width: width,
-                                  myVoteCastLocal: _myVoteCastLocal,
-                                  onVote: (yes) async {
-                                    if (_myVoteCastLocal ||
-                                        g.iVoted) return;
-                                    setState(() {
-                                      _myVoteCastLocal = true;
-                                    });
-                                    await g.castVote(yes);
-                                  },
+                                Positioned.fill(
+                                  child: VotingOverlay(
+                                    game: g,
+                                    height: height,
+                                    width: width,
+                                    myVoteCastLocal: _myVoteCastLocal,
+                                    onVote: (yes) async {
+                                      if (_myVoteCastLocal || g.iVoted) return;
+                                      setState(() {
+                                        _myVoteCastLocal = true;
+                                      });
+                                      await g.castVote(yes);
+                                    },
+                                  ),
                                 ),
 
+                              // FULLSCREEN EXECUTIVE OVERLAYS
                               Positioned.fill(
                                 child: _buildExecutiveStack(
                                   g,
@@ -308,40 +290,40 @@ class _GameScreenState extends State<GameScreen>
                                 Align(
                                   alignment: Alignment.bottomCenter,
                                   child: RoleScrollOverlay(
-                                    game: g,
-                                    myUid: _uid!,
-                                    height: height,
-                                    width: width,
-                                  ),
+                                      game: g, myUid: _uid!, height: height, width: width),
                                 ),
                             ],
                           );
-                        }
+                        },
                       },
                     ),
+                  ),
 
-                    if (isGameOver)
-                      Positioned.fill(
-                        child: GameWinOverlay(
-                          game: _game,
-                          width: width,
-                          height: height,
-                          isHost: _uid == _creatorId,
-                          winnerTeam: winnerTeam!,
-                          onHostReturn: _uid == _creatorId
-                              ? () async {
-                                  await FirebaseFirestore.instance
-                                      .collection('states')
-                                      .doc(widget.code)
-                                      .delete();
-                                  await _firebase.resetLobby(
-                                      widget.code);
-                                }
-                              : null,
-                        ),
+                  // FULLSCREEN AUTO WARNING
+                  if (_game.overlays.isActive('auto_warning'))
+                    const Positioned.fill(child: IgnorePointer(child: AutoWarningOverlay())),
+
+                  // GAME OVER FULLSCREEN
+                  if (isGameOver)
+                    Positioned.fill(
+                      child: GameWinOverlay(
+                        game: _game,
+                        width: width,
+                        height: height,
+                        isHost: _uid == _creatorId,
+                        winnerTeam: winnerTeam!,
+                        onHostReturn: _uid == _creatorId
+                            ? () async {
+                                await FirebaseFirestore.instance
+                                    .collection('states')
+                                    .doc(widget.code)
+                                    .delete();
+                                await _firebase.resetLobby(widget.code);
+                              }
+                            : null,
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
             );
           },
@@ -355,8 +337,7 @@ class _GameScreenState extends State<GameScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.black87,
-        title: const Text("End Game?",
-            style: TextStyle(color: Colors.white)),
+        title: const Text("End Game?", style: TextStyle(color: Colors.white)),
         content: const Text(
           "Send everyone back to the lobby?",
           style: TextStyle(color: Colors.white70),
@@ -374,13 +355,13 @@ class _GameScreenState extends State<GameScreen>
       ),
     );
   }
-    Future<bool?> _confirmLeaveGame(BuildContext context) {
+
+  Future<bool?> _confirmLeaveGame(BuildContext context) {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.black87,
-        title: const Text("Leave Game?",
-            style: TextStyle(color: Colors.white)),
+        title: const Text("Leave Game?", style: TextStyle(color: Colors.white)),
         content: const Text(
           "Leaving will end the game for everyone.",
           style: TextStyle(color: Colors.white70),
@@ -401,19 +382,11 @@ class _GameScreenState extends State<GameScreen>
 
 
   Widget _buildExecutiveStack(
-    WizardGameView g,
-    double width,
-    double height,
-    bool isHM,
-    bool isHost,
-  ) {
+      WizardGameView g, double width, double height, bool isHM, bool isHost) {
     return Stack(
       children: [
         if (g.phase == 'executive_investigate')
-          ExecutiveInvestigateOverlay(
-            isHeadmaster: isHM,
-            height: height,
-          ),
+          ExecutiveInvestigateOverlay(isHeadmaster: isHM, height: height),
 
         if (g.phase == 'executive_investigate_result')
           ExecutiveInvestigateResultOverlay(
@@ -433,48 +406,36 @@ class _GameScreenState extends State<GameScreen>
           ),
 
         if (g.phase == 'executive_choose_hm')
-          ExecutiveChooseHeadmasterOverlay(
-            isHeadmaster: isHM,
-            height: height,
-          ),
+          ExecutiveChooseHeadmasterOverlay(isHeadmaster: isHM, height: height),
 
         if (g.phase == 'executive_choose_hm_result')
           ExecutiveChooseHeadmasterResultOverlay(
             game: g,
             isHeadmaster: isHM,
             height: height,
-            onConfirm: () =>
-                _firebase.confirmNextHeadmaster(g.lobbyId),
+            onConfirm: () => _firebase.confirmNextHeadmaster(g.lobbyId),
           ),
 
         if (g.phase == 'executive_kill')
-          ExecutiveKillOverlay(
-            isHeadmaster: isHM,
-            height: height,
-          ),
+          ExecutiveKillOverlay(isHeadmaster: isHM, height: height),
 
-        if (g.phase == 'executive_kill_result' ||
-            g.phase == 'executive_kill_result_arch')
+        if (g.phase == 'executive_kill_result' || g.phase == 'executive_kill_result_arch')
           ExecutiveKillResultOverlay(
             game: g,
             height: height,
             width: width,
-            isArch: g.phase ==
-                'executive_kill_result_arch',
+            isArch: g.phase == 'executive_kill_result_arch',
             isHost: isHost,
             onContinue: isHost
                 ? () async {
-                    if (g.phase ==
-                        'executive_kill_result_arch') {
+                    if (g.phase == 'executive_kill_result_arch') {
                       await _firebase.setGameOver(
                         lobbyId: g.lobbyId,
                         winningTeam: "order",
                       );
                       return;
                     }
-
-                    await _firebase.finalizeKill(
-                        g.lobbyId);
+                    await _firebase.finalizeKill(g.lobbyId);
                   }
                 : null,
           ),

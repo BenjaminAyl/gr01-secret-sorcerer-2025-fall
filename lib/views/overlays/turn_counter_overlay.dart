@@ -4,15 +4,16 @@ import 'package:secret_sorcerer/views/game_view.dart';
 
 class TurnCounterOverlay extends StatelessWidget {
   final WizardGameView game;
-
   const TurnCounterOverlay({super.key, required this.game});
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+
     final diameter = size.width * 0.11;
     final center = game.boardCenterOnScreen;
-    final double nudgeRight = size.width * 0.008; 
+
+    final double nudgeRight = size.width * 0.008;
 
     return Stack(
       children: [

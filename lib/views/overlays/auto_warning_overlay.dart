@@ -21,6 +21,7 @@ class _AutoWarningOverlayState extends State<AutoWarningOverlay>
   @override
   void initState() {
     super.initState();
+
     _fadeCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -31,13 +32,12 @@ class _AutoWarningOverlayState extends State<AutoWarningOverlay>
       curve: Curves.easeOut,
     );
 
-    // Fade IN
+    // Fade in then hold then fade out
     _fadeCtrl.forward().then((_) async {
       await Future.delayed(const Duration(milliseconds: 1200));
-
-      // Fade OUT
       if (mounted) _fadeCtrl.reverse();
     });
+
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1300),
@@ -49,6 +49,7 @@ class _AutoWarningOverlayState extends State<AutoWarningOverlay>
         curve: Curves.easeInOutCubic,
       ),
     );
+
     for (int i = 0; i < 18; i++) {
       _runes.add(_FloatingRune(this));
     }
@@ -58,65 +59,72 @@ class _AutoWarningOverlayState extends State<AutoWarningOverlay>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    return FadeTransition(
-      opacity: _fade,
-      child: Stack(
-        children: [
-          // Darkened background
-          Container(
-            color: Colors.black.withOpacity(0.82),
-          ),
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(color: Colors.black87),
+        ),
+        FadeTransition(
+          opacity: _fade,
+          child: Stack(
+            children: [
+              // Darkened layer
+              Positioned.fill(
+                child: Container(color: Colors.black.withOpacity(0.82)),
+              ),
 
-          // Floating rune particles
-          ..._runes.map(
-            (r) => AnimatedBuilder(
-              animation: r.controller,
-              builder: (_, __) => Positioned(
-                left: size.width * r.x,
-                top: size.height * r.y.value,
-                child: Opacity(
-                  opacity: ((1 - r.y.value) * 0.7).clamp(0.0, 1.0),
-
-                  child: Transform.rotate(
-                    angle: r.rotation.value,
-                    child: Text(
-                      r.rune,
-                      style: TextStyle(
-                        color: Colors.redAccent.withOpacity(0.75),
-                        fontSize: size.width * 0.04,
-                        fontWeight: FontWeight.w600,
-                        shadows: const [
-                          Shadow(color: Colors.black, blurRadius: 8),
-                        ],
+              // Runes
+              ..._runes.map(
+                (r) => AnimatedBuilder(
+                  animation: r.controller,
+                  builder: (_, __) => Positioned(
+                    left: size.width * r.x,
+                    top: size.height * r.y.value,
+                    child: Opacity(
+                      opacity:
+                          ((1 - r.y.value) * 0.7).clamp(0.0, 1.0),
+                      child: Transform.rotate(
+                        angle: r.rotation.value,
+                        child: Text(
+                          r.rune,
+                          style: TextStyle(
+                            color: Colors.redAccent.withOpacity(0.75),
+                            fontSize: size.width * 0.04,
+                            fontWeight: FontWeight.w600,
+                            shadows: const [
+                              Shadow(color: Colors.black, blurRadius: 8),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
 
-          // Big pulsing warning text
-          Center(
-            child: ScaleTransition(
-              scale: _pulse,
-              child: Text(
-                "Chaotic Magic Surges…\nA Random Spell Will Be Enacted.",
-                textAlign: TextAlign.center,
-                style: TextStyles.title.copyWith(
-                  fontSize: size.width * 0.075,
-                  color: Colors.redAccent,
-                  height: 1.25,
-                  shadows: const [
-                    Shadow(color: Colors.black, blurRadius: 20),
-                    Shadow(color: Colors.redAccent, blurRadius: 30),
-                  ],
+              // Center text
+              Center(
+                child: ScaleTransition(
+                  scale: _pulse,
+                  child: Text(
+                    "Chaotic Magic Surges…\nA Random Spell Will Be Enacted.",
+                    textAlign: TextAlign.center,
+                    style: TextStyles.title.copyWith(
+                      fontSize: size.width * 0.075,
+                      color: Colors.redAccent,
+                      height: 1.25,
+                      shadows: const [
+                        Shadow(color: Colors.black, blurRadius: 20),
+                        Shadow(color: Colors.redAccent, blurRadius: 30),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -130,6 +138,7 @@ class _AutoWarningOverlayState extends State<AutoWarningOverlay>
     super.dispose();
   }
 }
+
 class _FloatingRune {
   late AnimationController controller;
   late Animation<double> y;

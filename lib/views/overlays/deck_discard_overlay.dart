@@ -56,22 +56,29 @@ class _DeckDiscardOverlayState extends State<DeckDiscardOverlay>
       _handleStateChange();
     });
   }
-
   void _measureCenters() {
     final deckBox = _deckKey.currentContext?.findRenderObject() as RenderBox?;
-    final discardBox =
-        _discardKey.currentContext?.findRenderObject() as RenderBox?;
+    final discardBox = _discardKey.currentContext?.findRenderObject() as RenderBox?;
+    final overlayBox = context.findRenderObject() as RenderBox?;
+
+    if (overlayBox == null) return;
 
     if (deckBox != null) {
-      final pos = deckBox.localToGlobal(Offset.zero);
-      _deckCenter = pos + deckBox.size.center(Offset.zero);
+      final globalCenter = deckBox.localToGlobal(
+        deckBox.size.center(Offset.zero),
+      );
+      _deckCenter = overlayBox.globalToLocal(globalCenter);
     }
 
     if (discardBox != null) {
-      final pos = discardBox.localToGlobal(Offset.zero);
-      _discardCenter = pos + discardBox.size.center(Offset.zero);
+      final globalCenter = discardBox.localToGlobal(
+        discardBox.size.center(Offset.zero),
+      );
+      _discardCenter = overlayBox.globalToLocal(globalCenter);
     }
   }
+
+
 
   void _handleStateChange() {
     final g = widget.game;
