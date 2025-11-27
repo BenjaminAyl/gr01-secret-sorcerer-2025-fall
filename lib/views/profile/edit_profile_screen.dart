@@ -1,16 +1,15 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
-import 'package:secret_sorcerer/models/hats.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
 import 'package:secret_sorcerer/widgets/account/edit_nickname.dart';
 import 'package:secret_sorcerer/widgets/account/edit_password.dart';
 import 'package:secret_sorcerer/widgets/account/edit_username.dart';
 import 'package:secret_sorcerer/widgets/buttons/back_nav_button.dart';
+import 'package:secret_sorcerer/widgets/dialogs/profile_customization_dialog.dart';
 import 'package:secret_sorcerer/widgets/info_row.dart';
 import 'package:secret_sorcerer/widgets/buttons/pill_button.dart';
 import 'package:secret_sorcerer/controllers/user_auth.dart';
@@ -36,53 +35,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _loadUser() async {
     final userAuth = UserAuth();
     final AppUser? currentUser = await userAuth.getCurrentUser();
-    // TODO: update userAuth to use firestore to store current user
     if (!mounted) return;
     setState(() {
       _user = currentUser;
       _hatColor = currentUser?.hatColor ?? 'hatDefault';
-      }
-    );
+    });
   }
 
-  Future<void> _editHat() async {
+  Future<void> _openProfileCustomization() async {
+    final result = await showDialog<ProfileCustomizationResult>(
+      context: context,
+      builder: (_) => ProfileCustomizationDialog(
+        currentHatColor: _hatColor,
+        onChangeProfilePicture: _editProfilePicture,
+      ),
+    );
+
+    if (result != null && mounted) {
+      if (result.hatColor != _hatColor) {
+        await firebaseController.editHat(
+          FirebaseAuth.instance.currentUser!.uid,
+          result.hatColor,
+        );
+      }
+      await _loadUser();
+    }
+  }
+
+  Future<void> _editProfilePicture() async {
     showDialog<void>(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        titleTextStyle: TextStyles.title,
+      context: context,
+      builder: (_) => AlertDialog(
         backgroundColor: AppColors.primaryBrand,
-        title: const Text("Choose Hat Color"),
-        content: SizedBox(
-          width: double.minPositive,
-          child: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-            ),
-            shrinkWrap: true,
-            itemCount: HatColors.values.length,
-            itemBuilder: (_, index) {
-              final color = HatColors.values[index];
-              return ListTile(
-                title: Image.asset('assets/images/hats/${hatColorToString(color)}.png',
-                  height: 50,
-                  width: 50,
-                ),
-                onTap: () async {
-                  await firebaseController.editHat(FirebaseAuth.instance.currentUser!.uid, hatColorToString(color));
-                  await _loadUser();
-                  Navigator.of(context).pop();
-                  },
-              );
-            },
+        titleTextStyle: TextStyles.title,
+        title: const Text('Edit Profile Picture'),
+        content: Text(
+          'Profile picture editing will be available soon.',
+          style: TextStyles.body.copyWith(
+            color: Colors.white.withOpacity(0.85),
           ),
         ),
-      );
-    },
-  );
-    
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK', style: TextStyle(color: Colors.white70)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _editNickname() async {
@@ -124,7 +124,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           return true; // temporary success
         },
         changePassword: (newPassword) async {
-          // TODO: Implement password change logic later
           return null;
         },
       ),
@@ -142,7 +141,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.secondaryBG,
         centerTitle: true,
-        leading: BackNavButtonSound(icon: Icons.arrow_back),
+        leading: const BackNavButtonSound(icon: Icons.arrow_back),
         title: const Text('Edit Profile', style: TextStyles.subheading),
       ),
       body: SafeArea(
@@ -152,42 +151,59 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             padding: AppSpacing.screen,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                // Avatar with "Edit" pill
-                Center(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const CircleAvatar(
-                        radius: 56,
-                        backgroundColor: AppColors.secondaryBrand,
-                        child: Icon(
-                          Icons.person,
-                          size: 56,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Positioned(
-                        right: 40,
-                        top: -26,
-                        child: Image.asset('assets/images/hats/${_hatColor}.png',
-                          height: 50,
-                          width: 50,
-                          ),
+                const SizedBox(height: 40),
 
-                      ),
-                      Positioned(
-                        right: -18,
-                        top: -10,
-                        child: PillButton.small(
-                          label: 'Edit',
-                          onPressed: () async {
-                            await _editHat();
-                          },
+                // Avatar + hat + single "Edit" button
+                Center(
+                  child: SizedBox(
+                    width: 220,
+                    height: 200,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Avatar
+                        const Align(
+                          alignment: Alignment.center,
+                          child: CircleAvatar(
+                            radius: AppSpacing.avatarMedium,
+                            backgroundColor: AppColors.secondaryBrand,
+                            child: Icon(
+                              Icons.person,
+                              size: AppSpacing.avatarMedium,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+
+                        // Bigger hat overlay
+                        Align(
+                          alignment: Alignment.center,
+                          child: Transform.translate(
+                            offset: const Offset(0, -66),
+                            child: Image.asset(
+                              'assets/images/hats/$_hatColor.png',
+                              height: AppSpacing.hatHeightLarge,
+                              width: AppSpacing.hatWidthLarge,
+                            ),
+                          ),
+                        ),
+
+                        // Edit button at top-right of avatar, overlapping
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Transform.translate(
+                            // shift left a bit and up by ~avatar radius
+                            offset: Offset(-8, -AppSpacing.avatarMedium * 0.8),
+                            child: PillButton.small(
+                              label: 'Edit',
+                              onPressed: _openProfileCustomization,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
