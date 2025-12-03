@@ -2,22 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/widgets/avatar/avatar_display.dart';
 import 'package:secret_sorcerer/widgets/buttons/pill_button.dart';
 import 'package:secret_sorcerer/widgets/dialogs/hat_selection_dialog.dart';
+import 'package:secret_sorcerer/widgets/dialogs/avatar_selection_dialog.dart';
 
 /// Result returned when the user taps "Save" in the profile customization dialog.
 class ProfileCustomizationResult {
   final String hatColor;
-  ProfileCustomizationResult({required this.hatColor});
+  final String avatarColor;
+
+  ProfileCustomizationResult({
+    required this.hatColor,
+    required this.avatarColor,
+  });
 }
 
 class ProfileCustomizationDialog extends StatefulWidget {
   final String currentHatColor;
+  final String currentAvatarColor; // Firestore field: avatarColor
   final Future<void> Function()? onChangeProfilePicture;
 
   const ProfileCustomizationDialog({
     super.key,
     required this.currentHatColor,
+    required this.currentAvatarColor,
     this.onChangeProfilePicture,
   });
 
@@ -29,11 +38,13 @@ class ProfileCustomizationDialog extends StatefulWidget {
 class _ProfileCustomizationDialogState
     extends State<ProfileCustomizationDialog> {
   late String _tempHatColor;
+  late String _tempAvatarColor;
 
   @override
   void initState() {
     super.initState();
     _tempHatColor = widget.currentHatColor;
+    _tempAvatarColor = widget.currentAvatarColor;
   }
 
   Future<void> _chooseHat() async {
@@ -49,13 +60,17 @@ class _ProfileCustomizationDialogState
     }
   }
 
-  Future<void> _changeProfilePicture() async {
-    if (widget.onChangeProfilePicture != null) {
-      await widget.onChangeProfilePicture!();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile picture editing not available.')),
-      );
+  Future<void> _chooseAvatar() async {
+    final selectedAvatarColor = await showDialog<String>(
+      context: context,
+      builder: (_) =>
+          AvatarSelectionDialog(currentAvatarColor: _tempAvatarColor),
+    );
+
+    if (selectedAvatarColor != null) {
+      setState(() {
+        _tempAvatarColor = selectedAvatarColor;
+      });
     }
   }
 
@@ -66,76 +81,51 @@ class _ProfileCustomizationDialogState
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
       ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+      contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
 
-      title: null,
-      titlePadding: EdgeInsets.zero,
-
-      // WIDEN DIALOG
-      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-
-      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+      // ^ slightly smaller top padding, we add our own spacer below
       content: SizedBox(
-        width: 350, // wider dialog
+        width: 350,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 240,
-              height: 200,
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  const CircleAvatar(
-                    radius: AppSpacing.avatarMedium,
-                    backgroundColor: AppColors.secondaryBrand,
-                    child: Icon(
-                      Icons.person,
-                      size: AppSpacing.avatarMedium,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Transform.translate(
-                    offset: const Offset(0, -66),
-                    child: Image.asset(
-                      'assets/images/hats/$_tempHatColor.png',
-                      height: AppSpacing.hatHeightLarge,
-                      width: AppSpacing.hatWidthLarge,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // 🔥 Extra top space so the hat doesn’t hit the top border
+            const SizedBox(height: 48),
 
-            const SizedBox(height: 8),
-
-            Column(
-              children: [
-                PillButton.small(label: 'Change hat', onPressed: _chooseHat),
-                const SizedBox(height: 10),
-                PillButton.small(
-                  label: 'Change profile picture',
-                  onPressed: _changeProfilePicture,
-                ),
-              ],
+            /// Top avatar preview
+            AvatarDisplay(
+              avatarColor: _tempAvatarColor,
+              hatColor: _tempHatColor,
+              radius: AppSpacing.avatarMedium,
             ),
 
             const SizedBox(height: 12),
+
+            /// Buttons
+            PillButton.small(label: 'Change hat', onPressed: _chooseHat),
+
+            const SizedBox(height: 12),
+
+            PillButton.small(label: 'Change avatar', onPressed: _chooseAvatar),
+
+            const SizedBox(height: 22),
+
             Text(
-              'Adjust your hat and picture, then save or discard.',
+              'Adjust your avatar and hat, then save or discard.',
               style: TextStyles.body.copyWith(
                 color: Colors.white.withOpacity(0.8),
               ),
               textAlign: TextAlign.center,
             ),
+
+            const SizedBox(height: 10),
           ],
         ),
       ),
 
-      // CENTERED ACTION BUTTONS
       actionsAlignment: MainAxisAlignment.center,
-      actionsPadding: const EdgeInsets.only(bottom: 10),
-
+      actionsPadding: const EdgeInsets.only(bottom: 14),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -143,9 +133,12 @@ class _ProfileCustomizationDialogState
         ),
         TextButton(
           onPressed: () {
-            Navigator.of(
-              context,
-            ).pop(ProfileCustomizationResult(hatColor: _tempHatColor));
+            Navigator.of(context).pop(
+              ProfileCustomizationResult(
+                hatColor: _tempHatColor,
+                avatarColor: _tempAvatarColor,
+              ),
+            );
           },
           child: const Text('Save', style: TextStyle(color: Colors.white)),
         ),

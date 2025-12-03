@@ -8,17 +8,17 @@ import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/firebase_options.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
-
+import 'package:secret_sorcerer/utils/current_style.dart';
 
 final userAuth = UserAuth();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await AudioHelper.init();
+  final user = await UserAuth().getCurrentUser();
+  CurrentStyle.loadFromUser(user);
   runApp(const MainApp());
 }
 

@@ -4,6 +4,7 @@ class AppUser {
   final String username;
   final String nickname;
   final String hatColor;
+  final String avatarColor;
   final int wins;
   final int losses;
 
@@ -15,6 +16,7 @@ class AppUser {
     this.wins = 0,
     this.losses = 0,
     this.hatColor = 'hatDefault',
+    this.avatarColor = 'avatarDefault',
   });
 
   factory AppUser.fromMap(Map data) {
@@ -24,6 +26,7 @@ class AppUser {
       username: data['username'] ?? '',
       nickname: data['nickname'] ?? '',
       hatColor: data['hatColor'] ?? 'hatDefault',
+      avatarColor: data['avatarColor'] ?? 'avatarDefault',
       wins: data['wins'] ?? 0,
       losses: data['losses'] ?? 0,
     );

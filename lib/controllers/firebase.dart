@@ -136,6 +136,12 @@ class FirebaseController {
     });
   }
 
+  Future<void> editAvatar(String uid, String avatarColor) async {
+    await _firestore.collection('users').doc(uid).update({
+      'avatarColor': avatarColor,
+    });
+  }
+
   //Start game entrance
   Future<void> startGame(String lobbyId, List<String> playerIds) async {
     final stateRef = _firestore.collection('states').doc(lobbyId);
