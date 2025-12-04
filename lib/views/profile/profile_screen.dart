@@ -1,9 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/controllers/firebase.dart';
 import 'package:secret_sorcerer/controllers/user_auth.dart';
+import 'package:secret_sorcerer/models/game_player.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
 import 'package:secret_sorcerer/utils/current_style.dart';
@@ -126,8 +129,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Lv $currentLevel", style: TextStyles.body),
-                        Text("Lv ${currentLevel + 1}", style: TextStyles.body),
+                        Text("Lv ${_user?.currentLevel}", style: TextStyles.body),
+                        Text("Lv ${_user?.currentLevel != null ? _user!.currentLevel + 1 : 2}", style: TextStyles.body),
                       ],
                     ),
 
@@ -144,7 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         child: FractionallySizedBox(
                           alignment: Alignment.centerLeft,
-                          widthFactor: exp / 100,
+                          widthFactor: (_user?.exp != null ? _user!.exp.toDouble() : 0.0) / 100,
                           child: Container(
                             decoration: BoxDecoration(
                               color: AppColors.customAccent,
