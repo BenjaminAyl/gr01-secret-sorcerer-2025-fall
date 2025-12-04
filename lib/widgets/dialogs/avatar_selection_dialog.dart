@@ -2,27 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
-import 'package:secret_sorcerer/models/hats.dart';
+import 'package:secret_sorcerer/models/avatars.dart';
+import 'package:secret_sorcerer/widgets/avatar/avatar_display.dart';
 
-class HatSelectionDialog extends StatefulWidget {
-  final String currentHatColor;
+class AvatarSelectionDialog extends StatefulWidget {
+  final String currentAvatarColor; // Firestore field: avatarColor
 
-  const HatSelectionDialog({
-    super.key,
-    required this.currentHatColor,
-  });
+  const AvatarSelectionDialog({super.key, required this.currentAvatarColor});
 
   @override
-  State<HatSelectionDialog> createState() => _HatSelectionDialogState();
+  State<AvatarSelectionDialog> createState() => _AvatarSelectionDialogState();
 }
 
-class _HatSelectionDialogState extends State<HatSelectionDialog> {
-  late String _previewHat;
+class _AvatarSelectionDialogState extends State<AvatarSelectionDialog> {
+  late String _previewAvatarColor;
 
   @override
   void initState() {
     super.initState();
-    _previewHat = widget.currentHatColor;
+    _previewAvatarColor = widget.currentAvatarColor;
   }
 
   @override
@@ -39,8 +37,9 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
       titlePadding: const EdgeInsets.only(top: 16),
       title: Center(
         child: Text(
-          'Choose Hat',
+          'Choose Avatar',
           style: TextStyles.title,
+          textAlign: TextAlign.center,
         ),
       ),
 
@@ -53,24 +52,17 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
           children: [
             const SizedBox(height: 20),
 
-            // 🔥 HAT-ONLY PREVIEW
-            SizedBox(
-              width: 180,
-              height: 130,
-              child: Center(
-                child: Image.asset(
-                  'assets/images/hats/$_previewHat.png',
-                  height: AppSpacing.hatHeightLarge,
-                  width: AppSpacing.hatWidthLarge,
-                  fit: BoxFit.contain,
-                ),
-              ),
+            // Avatar preview with NO BACKGROUND, using shared widget
+            AvatarDisplay(
+              avatarColor: _previewAvatarColor,
+              hatColor: null, // no hats here
+              radius: AppSpacing.avatarMedium,
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
 
             Text(
-              'Choose a hat and press "OK"',
+              'Choose your avatar then press "OK"',
               style: TextStyles.body.copyWith(
                 color: Colors.white.withOpacity(0.8),
               ),
@@ -79,7 +71,7 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
 
             const SizedBox(height: 10),
 
-            // Hat selection grid
+            // Avatar grid
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -88,35 +80,37 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
               ),
-              itemCount: HatColors.values.length,
+              itemCount: AvatarColors.values.length,
               itemBuilder: (context, index) {
-                final hatEnum = HatColors.values[index];
-                final hatKey = hatColorToString(hatEnum);
-                final isSelected = hatKey == _previewHat;
+                final avatarEnum = AvatarColors.values[index];
+                final avatarKey = avatarColorToString(avatarEnum);
+                final isSelected = avatarKey == _previewAvatarColor;
 
                 return InkWell(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
                   onTap: () {
                     setState(() {
-                      _previewHat = hatKey;
+                      _previewAvatarColor = avatarKey;
                     });
                   },
                   child: Container(
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? AppColors.secondaryBrand.withOpacity(0.20)
+                          ? AppColors.secondaryBrand.withOpacity(0.2)
                           : Colors.white.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusCard,
+                      ),
                       border: Border.all(
                         color: isSelected
-                            ? AppColors.secondaryBrand
+                            ? AppColors.customAccent
                             : Colors.white24,
                         width: isSelected ? 2 : 1,
                       ),
                     ),
                     padding: const EdgeInsets.all(8),
                     child: Image.asset(
-                      'assets/images/hats/$hatKey.png',
+                      'assets/images/avatars/$avatarKey.png',
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -127,9 +121,9 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
         ),
       ),
 
-      // Buttons
       actionsAlignment: MainAxisAlignment.center,
       actionsPadding: const EdgeInsets.only(bottom: 12, top: 4),
+
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -142,13 +136,10 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
           ),
         ),
         TextButton(
-          onPressed: () => Navigator.of(context).pop(_previewHat),
+          onPressed: () => Navigator.of(context).pop(_previewAvatarColor),
           child: const Text(
             'OK',
-            style: TextStyle(
-              color: AppColors.textAccent,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: AppColors.textAccent, fontSize: 16),
           ),
         ),
       ],

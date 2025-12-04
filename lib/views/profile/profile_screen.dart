@@ -6,6 +6,8 @@ import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
+import 'package:secret_sorcerer/utils/current_style.dart';
+import 'package:secret_sorcerer/widgets/avatar/avatar_display.dart';
 import 'package:secret_sorcerer/widgets/buttons/back_nav_button.dart';
 import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 import 'package:secret_sorcerer/widgets/dialogs/volume_dialog.dart';
@@ -20,27 +22,47 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   AppUser? _user;
   final userAuth = UserAuth();
-  String _hatColor = 'hatDefault';
 
   @override
   void initState() {
     super.initState();
-    _loadUser();
+    _loadUserInfo();
   }
 
-  Future<void> _loadUser() async {
+  /// Loads user object (mainly for future use / safety).
+  /// Nickname + username for display now come from CurrentStyle.
+  Future<void> _loadUserInfo() async {
     final currentUser = await userAuth.getCurrentUser();
     if (!mounted) return;
     setState(() {
       _user = currentUser;
-      _hatColor = currentUser?.hatColor ?? 'hatDefault';
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final nickname = _user?.nickname ?? '';
-    final username = '@${_user?.username ?? ''}';
+    // If nothing is ready yet, show a loader (first app launch edge case)
+    if (_user == null && !CurrentStyle.isLoaded) {
+      return const Scaffold(
+        backgroundColor: AppColors.secondaryBG,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Cached style values (instant, no flicker)
+    final String hatColor = CurrentStyle.hatColor;
+    final String avatarColor = CurrentStyle.avatarColor;
+
+    // Prefer cached nickname/username; fall back to _user if cache isn't ready.
+    final String nickname = CurrentStyle.isLoaded
+        ? CurrentStyle.nickname
+        : (_user?.nickname ?? '');
+
+    final String rawUsername = CurrentStyle.isLoaded
+        ? CurrentStyle.username
+        : (_user?.username ?? '');
+
+    final String username = '@$rawUsername';
 
     return Scaffold(
       backgroundColor: AppColors.secondaryBG,
@@ -74,48 +96,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 AppSpacing.gapM,
 
-                // Avatar + hat preview (same styling as EditProfileScreen but no big gap under)
-                // Avatar + hat preview (tight spacing, hat always on top)
+                // Avatar + hat preview (cached instantly)
                 SizedBox(
                   width: 220,
-                  height: 160, // reduced from 170 to tighten layout
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Avatar at bottom center
-                      const Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: CircleAvatar(
-                          radius: AppSpacing.avatarMedium,
-                          backgroundColor: AppColors.secondaryBrand,
-                          child: Icon(
-                            Icons.person,
-                            size: AppSpacing.avatarMedium,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-
-                      // 🔥 Hat painted AFTER avatar = always on top
-                      Positioned(
-                        bottom: AppSpacing.avatarMedium + 18,
-                        left: 0,
-                        right: 0,
-                        child: Image.asset(
-                          'assets/images/hats/$_hatColor.png',
-                          height: AppSpacing.hatHeightLarge,
-                          width: AppSpacing.hatWidthLarge,
-                        ),
-                      ),
-                    ],
+                  height: 160,
+                  child: Center(
+                    child: AvatarDisplay(
+                      avatarColor: avatarColor,
+                      hatColor: hatColor,
+                      radius: AppSpacing.avatarMedium,
+                    ),
                   ),
                 ),
 
                 AppSpacing.gapS,
 
-                // User name + username
                 Text(nickname, style: TextStyles.bodyLarge),
                 AppSpacing.gapXS,
                 Text(username, style: TextStyles.body),
@@ -126,22 +121,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   label: 'Edit Profile',
                   onPressed: () async {
                     await context.push('/profile/edit');
-                    await _loadUser(); // refresh hat and other info on return
+
+                    // Refresh underlying user object (email, etc.)
+                    await _loadUserInfo();
+
+                    // Avatar/hat/nickname/username are already updated in cache
+                    if (mounted) setState(() {});
                   },
                 ),
+
                 AppSpacing.buttonSpacing,
                 PrimaryButton(
                   label: 'Manage Friends',
                   onPressed: () async {
                     await context.push('/profile/friends');
-                    await _loadUser();
+                    await _loadUserInfo();
                   },
                 ),
+
                 AppSpacing.buttonSpacing,
                 PrimaryButton(
                   label: 'Log Out',
                   onPressed: () async {
                     await userAuth.signOut();
+                    CurrentStyle.reset(); // Clear cache on logout
                     if (!context.mounted) return;
                     context.push('/');
                   },

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/widgets/avatar/avatar_display.dart';
 
 class LeaderboardWindow extends StatelessWidget {
   final List<Map<String, dynamic>> leaderboardData;
@@ -13,7 +14,7 @@ class LeaderboardWindow extends StatelessWidget {
     return Center(
       child: Container(
         width: AppSpacing.cardWidthLarge,
-        height: AppSpacing.buttonHeightLarge * 6,
+        height: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.secondaryBrand,
@@ -25,12 +26,12 @@ class LeaderboardWindow extends StatelessWidget {
           children: [
             Text(
               'Leaderboard',
-              style: TextStyles.subheading, // smaller text
+              style: TextStyles.subheading,
               textAlign: TextAlign.center,
             ),
             AppSpacing.gapM,
 
-            /// CENTERED COLUMN HEADERS
+            /// Column headers
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: const [
@@ -61,58 +62,84 @@ class LeaderboardWindow extends StatelessWidget {
               child: ListView.separated(
                 itemCount: leaderboardData.length,
                 separatorBuilder: (_, __) =>
-                    Divider(color: AppColors.customAccent, height: 16),
+                    Divider(color: AppColors.customAccent, height: 18),
                 itemBuilder: (context, index) {
                   final entry = leaderboardData[index];
 
-                  return Row(
-                    children: [
-                      Expanded(
-                        flex: 4,
-                        child: Row(
-                          children: [
-                            // TODO: Replace with profile picture
-                            CircleAvatar(
-                              radius: 16,
-                              backgroundColor: AppColors.customAccent,
-                              child: Image.asset(
-                                "assets/images/wizard_hat.png",
+                  final nickname = entry['Nickname'] ?? 'Unknown';
+                  final int wins = (entry['wins'] ?? 0) as int;
+                  final int losses = (entry['losses'] ?? 0) as int;
+
+                  final String avatarColor =
+                      entry['avatarColor'] ?? 'avatarDefault';
+                  final String hatColor = entry['hatColor'] ?? 'hatDefault';
+
+                  String winPercent;
+                  if (wins + losses > 0) {
+                    final pct = wins / (wins + losses) * 100;
+                    winPercent = '${pct.toStringAsFixed(1)}%';
+                  } else {
+                    winPercent = 'N/A';
+                  }
+
+                  return SizedBox(
+                    height:
+                        58, // 🔥 TALLER ROW HEIGHT (adjust 55–70 as you like)
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // PLAYER: avatar + name
+                        Expanded(
+                          flex: 4,
+                          child: Row(
+                            children: [
+                              /// 🔥 Larger avatar radius so the hat fits
+                              Transform.translate(
+                                offset: const Offset(
+                                  0,
+                                  9,
+                                ), // 🔥 moves avatar+hat downward slightly
+                                child: AvatarDisplay(
+                                  avatarColor: avatarColor,
+                                  hatColor: hatColor,
+                                  radius: 22,
+                                ),
                               ),
-                            ),
-                            AppSpacing.gapWM,
-                            Text(
-                              entry['Nickname'],
-                              style: TextStyles
-                                  .bodyLarge, // smaller than subheading
-                            ),
-                          ],
-                        ),
-                      ),
 
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          entry['wins']?.toString() ?? '0',
-                          style: TextStyles.bodyLarge,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
+                              AppSpacing.gapWM,
 
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          (entry['losses'] != null && entry['losses'] > 0)
-                              ? (entry['wins'] /
-                                            (entry['wins'] + entry['losses']) *
-                                            100)
-                                        .toStringAsFixed(1) +
-                                    '%'
-                              : 'N/A',
-                          style: TextStyles.bodyLarge,
-                          textAlign: TextAlign.center,
+                              Flexible(
+                                child: Text(
+                                  nickname,
+                                  style: TextStyles.bodyLarge,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+
+                        // WINS
+                        Expanded(
+                          flex: 1,
+                          child: Text(
+                            wins.toString(),
+                            style: TextStyles.bodyLarge,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+
+                        // WIN %
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            winPercent,
+                            style: TextStyles.bodyLarge,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),

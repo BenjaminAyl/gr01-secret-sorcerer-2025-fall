@@ -4,15 +4,17 @@ import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
+import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/models/user_model.dart';
+import 'package:secret_sorcerer/utils/current_style.dart';
 import 'package:secret_sorcerer/widgets/account/edit_nickname.dart';
 import 'package:secret_sorcerer/widgets/account/edit_password.dart';
 import 'package:secret_sorcerer/widgets/account/edit_username.dart';
+import 'package:secret_sorcerer/widgets/avatar/avatar_display.dart';
 import 'package:secret_sorcerer/widgets/buttons/back_nav_button.dart';
+import 'package:secret_sorcerer/widgets/buttons/pill_button.dart';
 import 'package:secret_sorcerer/widgets/dialogs/profile_customization_dialog.dart';
 import 'package:secret_sorcerer/widgets/info_row.dart';
-import 'package:secret_sorcerer/widgets/buttons/pill_button.dart';
-import 'package:secret_sorcerer/controllers/user_auth.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -23,8 +25,13 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   AppUser? _user;
-  String _hatColor = 'hatDefault';
+
+  // Start with cached values (no flash)
+  String _hatColor = CurrentStyle.hatColor;
+  String _avatarColor = CurrentStyle.avatarColor;
+
   final FirebaseController firebaseController = FirebaseController();
+  final userAuth = UserAuth();
 
   @override
   void initState() {
@@ -32,38 +39,69 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _loadUser();
   }
 
+  /// Fetch full user object from Firestore
   Future<void> _loadUser() async {
-    final userAuth = UserAuth();
     final AppUser? currentUser = await userAuth.getCurrentUser();
     if (!mounted) return;
-    setState(() {
-      _user = currentUser;
-      _hatColor = currentUser?.hatColor ?? 'hatDefault';
-    });
+
+    if (currentUser != null) {
+      // Update the UI based on Firestore data
+      setState(() {
+        _user = currentUser;
+        _hatColor = currentUser.hatColor;
+        _avatarColor = currentUser.avatarColor;
+      });
+
+      // 🔥 Keep cache in sync with Firestore values
+      CurrentStyle.update(
+        hat: currentUser.hatColor,
+        avatar: currentUser.avatarColor,
+        nickname: currentUser.nickname,
+        username: currentUser.username,
+      );
+    }
   }
 
+  /// Avatar/Hat customization
   Future<void> _openProfileCustomization() async {
     final result = await showDialog<ProfileCustomizationResult>(
       context: context,
       builder: (_) => ProfileCustomizationDialog(
         currentHatColor: _hatColor,
+        currentAvatarColor: _avatarColor,
         onChangeProfilePicture: _editProfilePicture,
       ),
     );
 
-    if (result != null && mounted) {
-      if (result.hatColor != _hatColor) {
-        await firebaseController.editHat(
-          FirebaseAuth.instance.currentUser!.uid,
-          result.hatColor,
-        );
-      }
-      await _loadUser();
+    if (result == null) return;
+
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    // Update Firestore where needed
+    if (result.hatColor != _hatColor) {
+      await firebaseController.editHat(uid, result.hatColor);
     }
+
+    if (result.avatarColor != _avatarColor) {
+      await firebaseController.editAvatar(uid, result.avatarColor);
+    }
+
+    // Update local UI instantly
+    setState(() {
+      _hatColor = result.hatColor;
+      _avatarColor = result.avatarColor;
+    });
+
+    // 🔥 Update global cached style
+    CurrentStyle.update(hat: result.hatColor, avatar: result.avatarColor);
+
+    // Refresh nickname/username/email from Firestore
+    await _loadUser();
   }
 
+  /// Temporary profile picture edit
   Future<void> _editProfilePicture() async {
-    showDialog<void>(
+    showDialog(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.primaryBrand,
@@ -77,7 +115,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.pop(context),
             child: const Text('OK', style: TextStyle(color: Colors.white70)),
           ),
         ],
@@ -92,6 +130,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         initial: _user?.nickname ?? '',
         save: (nickname) async {
           await UserAuth.updateNickname(nickname);
+
+          // 🔥 Update cache
+          CurrentStyle.updateNickname(nickname);
+
           await _loadUser();
           return null;
         },
@@ -109,6 +151,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             newUsername: username,
             oldUsername: _user?.username ?? '',
           );
+
+          // 🔥 Update cache
+          CurrentStyle.updateUsername(username);
+
           await _loadUser();
           return null;
         },
@@ -120,12 +166,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     await showDialog<void>(
       context: context,
       builder: (_) => EditPasswordDialog(
-        verifyCurrent: (currentPassword) async {
-          return true; // temporary success
-        },
-        changePassword: (newPassword) async {
-          return null;
-        },
+        verifyCurrent: (currentPassword) async => true,
+        changePassword: (newPassword) async => null,
       ),
     );
   }
@@ -154,7 +196,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               children: [
                 const SizedBox(height: 40),
 
-                // Avatar + hat + single "Edit" button
+                // Avatar + hat + Edit button
                 Center(
                   child: SizedBox(
                     width: 220,
@@ -163,38 +205,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       alignment: Alignment.center,
                       clipBehavior: Clip.none,
                       children: [
-                        // Avatar
-                        const Align(
-                          alignment: Alignment.center,
-                          child: CircleAvatar(
-                            radius: AppSpacing.avatarMedium,
-                            backgroundColor: AppColors.secondaryBrand,
-                            child: Icon(
-                              Icons.person,
-                              size: AppSpacing.avatarMedium,
-                              color: Colors.white,
-                            ),
-                          ),
+                        AvatarDisplay(
+                          avatarColor: _avatarColor,
+                          hatColor: _hatColor,
+                          radius: AppSpacing.avatarMedium,
                         ),
-
-                        // Bigger hat overlay
-                        Align(
-                          alignment: Alignment.center,
-                          child: Transform.translate(
-                            offset: const Offset(0, -66),
-                            child: Image.asset(
-                              'assets/images/hats/$_hatColor.png',
-                              height: AppSpacing.hatHeightLarge,
-                              width: AppSpacing.hatWidthLarge,
-                            ),
-                          ),
-                        ),
-
-                        // Edit button at top-right of avatar, overlapping
                         Align(
                           alignment: Alignment.centerRight,
                           child: Transform.translate(
-                            // shift left a bit and up by ~avatar radius
                             offset: Offset(-8, -AppSpacing.avatarMedium * 0.8),
                             child: PillButton.small(
                               label: 'Edit',

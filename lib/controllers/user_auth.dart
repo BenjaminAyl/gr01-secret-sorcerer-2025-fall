@@ -34,6 +34,7 @@ class UserAuth {
       'username': (data['Username'] ?? data['username'] ?? '').toString().toLowerCase(),
       'nickname': data['Nickname'] ?? data['nickname'] ?? '',
       'hatColor': data['HatColor'] ?? data['hatColor'] ?? 'hatDefault',
+      'avatarColor': data['avatarColor'] ?? data['avatarColor'] ?? 'avatarDefault',
     });
   }
 

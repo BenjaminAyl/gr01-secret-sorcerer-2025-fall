@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/controllers/user_auth.dart';
 import 'package:secret_sorcerer/main.dart';
+import 'package:secret_sorcerer/utils/current_style.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -79,6 +81,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 try {
                   await userAuth.signIn(email: email, password: password);
+                  final user = await userAuth.getCurrentUser();
+                  if (user != null) {
+                    CurrentStyle.loadFromUser(user); // Cache users avatar in util
+                  }
 
                   if (!context.mounted) return;
                   context.go('/home');
