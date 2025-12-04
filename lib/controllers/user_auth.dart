@@ -81,6 +81,10 @@ class UserAuth {
       "Nickname": nickname,
       "wins": 0,
       "losses": 0,
+      "hatColor": "hatDefault",
+      "avatar": "avatarDefault",
+      "currentLevel": 1,
+      "exp": 0,
     });
 
     return uid;
