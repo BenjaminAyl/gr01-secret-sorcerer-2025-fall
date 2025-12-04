@@ -78,7 +78,10 @@ class _RulesDialogState extends State<RulesDialog> {
               ),
 
               const SizedBox(height: 8),
-              const Divider(thickness: 1),
+              Divider(
+                thickness: 1,
+                color: AppColors.primaryBrand, // or any color you want
+              ),
 
               // Page content
               Expanded(

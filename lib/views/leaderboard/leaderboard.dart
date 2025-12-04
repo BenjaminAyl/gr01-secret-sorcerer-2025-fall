@@ -84,7 +84,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
                   ),
                   AppSpacing.gapL,
                   SizedBox(
-                    height: AppSpacing.buttonHeightLarge * 7.5,
+                    height: AppSpacing.buttonHeightLarge * 6.5,
                     width: AppSpacing.cardWidthLarge,
                     child: TabBarView(
                       children: [
