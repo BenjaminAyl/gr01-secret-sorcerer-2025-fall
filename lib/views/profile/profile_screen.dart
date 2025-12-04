@@ -62,6 +62,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? CurrentStyle.username
         : (_user?.username ?? '');
 
+    final int currentLevel = CurrentStyle.isLoaded
+        ? CurrentStyle.currentLevel
+        : (_user?.currentLevel ?? 1);
+
+    final int exp = CurrentStyle.isLoaded
+        ? CurrentStyle.currentExp
+        : (_user?.exp ?? 0);
+
     final String username = '@$rawUsername';
 
     return Scaffold(
@@ -108,6 +116,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
+                AppSpacing.gapS,
+                
+                AppSpacing.gapS,
+
+                // XP Bar with current + next level labels
+                Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Lv $currentLevel", style: TextStyles.body),
+                        Text("Lv ${currentLevel + 1}", style: TextStyles.body),
+                      ],
+                    ),
+
+                    AppSpacing.gapXS,
+
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 18,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade800,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: exp / 100,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.customAccent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                AppSpacing.gapM,
+
 
                 AppSpacing.gapS,
 
