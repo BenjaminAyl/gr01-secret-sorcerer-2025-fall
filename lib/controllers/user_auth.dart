@@ -35,6 +35,8 @@ class UserAuth {
       'nickname': data['Nickname'] ?? data['nickname'] ?? '',
       'hatColor': data['HatColor'] ?? data['hatColor'] ?? 'hatDefault',
       'avatarColor': data['avatarColor'] ?? data['avatarColor'] ?? 'avatarDefault',
+      'exp': data['exp'] ?? data['exp'] ?? 0,
+      'currentLevel': data['currentLevel'] ?? data['currentLevel'] ?? 0
     });
   }
 

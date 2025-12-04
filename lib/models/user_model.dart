@@ -7,6 +7,8 @@ class AppUser {
   final String avatarColor;
   final int wins;
   final int losses;
+  final int exp;
+  final int currentLevel;
 
   const AppUser({
     required this.uid,
@@ -17,6 +19,8 @@ class AppUser {
     this.losses = 0,
     this.hatColor = 'hatDefault',
     this.avatarColor = 'avatarDefault',
+    required this.exp,
+    required this.currentLevel,
   });
 
   factory AppUser.fromMap(Map data) {
@@ -29,6 +33,8 @@ class AppUser {
       avatarColor: data['avatarColor'] ?? 'avatarDefault',
       wins: data['wins'] ?? 0,
       losses: data['losses'] ?? 0,
+      exp: data['exp'] ?? 0,
+      currentLevel: data['currentLevel'] ?? 0
     );
   
 
@@ -42,5 +48,7 @@ class AppUser {
         'nickame': nickname,
         'wins': wins,
         'losses': losses,
+        'exp': exp,
+        'currentLevel': currentLevel
       };
 }

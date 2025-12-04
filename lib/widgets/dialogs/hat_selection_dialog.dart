@@ -6,10 +6,12 @@ import 'package:secret_sorcerer/models/hats.dart';
 
 class HatSelectionDialog extends StatefulWidget {
   final String currentHatColor;
+  final int level;
 
   const HatSelectionDialog({
     super.key,
     required this.currentHatColor,
+    required this.level
   });
 
   @override
@@ -92,35 +94,75 @@ class _HatSelectionDialogState extends State<HatSelectionDialog> {
               itemBuilder: (context, index) {
                 final hatEnum = HatColors.values[index];
                 final hatKey = hatColorToString(hatEnum);
+                final hatMeta = hatColorInfo[hatEnum]!;
+                final isUnlocked = widget.level >= hatMeta.requiredLevel;
                 final isSelected = hatKey == _previewHat;
 
                 return InkWell(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-                  onTap: () {
-                    setState(() {
-                      _previewHat = hatKey;
-                    });
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.secondaryBrand.withOpacity(0.20)
-                          : Colors.white.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.secondaryBrand
-                            : Colors.white24,
-                        width: isSelected ? 2 : 1,
+                  onTap: isUnlocked
+                      ? () {
+                          setState(() {
+                            _previewHat = hatKey;
+                          });
+                        }
+                      : null,
+                  child: Stack(
+                    children: [
+                      // --- Hat tile ---
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.secondaryBrand.withOpacity(0.20)
+                              : Colors.white.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.secondaryBrand
+                                : Colors.white24,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: Opacity(
+                          opacity: isUnlocked ? 1.0 : 0.25, // fade locked hats
+                          child: Image.asset(
+                            'assets/images/hats/$hatKey.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
                       ),
-                    ),
-                    padding: const EdgeInsets.all(8),
-                    child: Image.asset(
-                      'assets/images/hats/$hatKey.png',
-                      fit: BoxFit.contain,
-                    ),
+
+                      // --- Lock overlay + level ---
+                      if (!isUnlocked)
+                        Positioned.fill(
+                          child: Container(
+                            alignment: Alignment.center,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.lock,
+                                  color: Colors.white.withOpacity(0.9),
+                                  size: 30,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Lvl ${hatMeta.requiredLevel}",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 );
+
               },
             ),
           ],

@@ -7,21 +7,8 @@ import 'package:secret_sorcerer/models/user_model.dart';
 ///   - hatColor
 ///   - nickname
 ///   - username
-///
-/// Load once after login:
-///     CurrentStyle.loadFromUser(user);
-///
-/// Update after edits:
-///     CurrentStyle.updateAvatar(...)
-///     CurrentStyle.updateHat(...)
-///     CurrentStyle.updateNickname(...)
-///     CurrentStyle.updateUsername(...)
-///
-/// Access anywhere:
-///     CurrentStyle.avatarColor
-///     CurrentStyle.hatColor
-///     CurrentStyle.nickname
-///     CurrentStyle.username
+///   - currentLevel
+///   - currentExp (0–100)
 ///
 class CurrentStyle {
   // ============================================================
@@ -32,6 +19,9 @@ class CurrentStyle {
   static String? _nickname;
   static String? _username;
 
+  static int? _currentLevel;  // user’s current level
+  static int? _currentExp; // 0–100 xp percentage
+
   // ============================================================
   // Public Getters (with safe fallbacks)
   // ============================================================
@@ -41,7 +31,10 @@ class CurrentStyle {
   static String get nickname => _nickname ?? '';
   static String get username => _username ?? '';
 
-  /// Returns true when we know avatar + hat + nickname + username.
+  static int get currentLevel => _currentLevel ?? 1;      // default level 1
+  static int get currentExp => _currentExp ?? 0;     // default 0%
+
+  /// Returns true when core style values are loaded.
   static bool get isLoaded =>
       _avatarColor != null &&
       _hatColor != null &&
@@ -56,6 +49,9 @@ class CurrentStyle {
     _hatColor = user?.hatColor ?? 'hatDefault';
     _nickname = user?.nickname ?? '';
     _username = user?.username ?? '';
+
+    _currentLevel = user?.currentLevel ?? 1;
+    _currentExp = user?.exp ?? 0;
   }
 
   // ============================================================
@@ -77,6 +73,15 @@ class CurrentStyle {
     _username = newUsername;
   }
 
+  static void updateLevel(int newLevel) {
+    _currentLevel = newLevel;
+  }
+
+  static void updateExp(int newExp) {
+    // force clamp to 0–100 range
+    _currentExp = newExp.clamp(0, 100);
+  }
+
   // ============================================================
   // Combined Update
   // ============================================================
@@ -85,11 +90,16 @@ class CurrentStyle {
     String? hat,
     String? nickname,
     String? username,
+    int? level,
+    int? exp,
   }) {
     if (avatar != null) _avatarColor = avatar;
     if (hat != null) _hatColor = hat;
     if (nickname != null) _nickname = nickname;
     if (username != null) _username = username;
+
+    if (level != null) _currentLevel = level;
+    if (exp != null) _currentExp = exp.clamp(0, 100);
   }
 
   // ============================================================
@@ -100,5 +110,8 @@ class CurrentStyle {
     _hatColor = null;
     _nickname = null;
     _username = null;
+
+    _currentLevel = null;
+    _currentExp = null;
   }
 }

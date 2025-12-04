@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
+import 'package:secret_sorcerer/utils/current_style.dart';
 import 'package:secret_sorcerer/widgets/avatar/avatar_display.dart';
 import 'package:secret_sorcerer/widgets/buttons/pill_button.dart';
 import 'package:secret_sorcerer/widgets/dialogs/hat_selection_dialog.dart';
@@ -50,7 +51,7 @@ class _ProfileCustomizationDialogState
   Future<void> _chooseHat() async {
     final selectedHat = await showDialog<String>(
       context: context,
-      builder: (_) => HatSelectionDialog(currentHatColor: _tempHatColor),
+      builder: (_) => HatSelectionDialog(currentHatColor: _tempHatColor, level: CurrentStyle.currentLevel),
     );
 
     if (selectedHat != null) {
@@ -64,7 +65,7 @@ class _ProfileCustomizationDialogState
     final selectedAvatarColor = await showDialog<String>(
       context: context,
       builder: (_) =>
-          AvatarSelectionDialog(currentAvatarColor: _tempAvatarColor),
+          AvatarSelectionDialog(currentAvatarColor: _tempAvatarColor, level: CurrentStyle.currentLevel),
     );
 
     if (selectedAvatarColor != null) {
