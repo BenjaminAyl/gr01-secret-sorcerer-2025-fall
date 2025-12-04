@@ -7,8 +7,9 @@ import 'package:secret_sorcerer/widgets/avatar/avatar_display.dart';
 
 class AvatarSelectionDialog extends StatefulWidget {
   final String currentAvatarColor; // Firestore field: avatarColor
+  final int level; // user's current level
 
-  const AvatarSelectionDialog({super.key, required this.currentAvatarColor});
+  const AvatarSelectionDialog({super.key, required this.currentAvatarColor, required this.level});
 
   @override
   State<AvatarSelectionDialog> createState() => _AvatarSelectionDialogState();
@@ -85,34 +86,73 @@ class _AvatarSelectionDialogState extends State<AvatarSelectionDialog> {
                 final avatarEnum = AvatarColors.values[index];
                 final avatarKey = avatarColorToString(avatarEnum);
                 final isSelected = avatarKey == _previewAvatarColor;
-
+                final avatarMeta = avatarColorInfo[avatarEnum]!;
+                final isUnlocked = widget.level >= avatarMeta.requiredLevel;
                 return InkWell(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-                  onTap: () {
-                    setState(() {
-                      _previewAvatarColor = avatarKey;
-                    });
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.secondaryBrand.withOpacity(0.2)
-                          : Colors.white.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(
-                        AppSpacing.radiusCard,
+                  onTap: isUnlocked
+                      ? () {
+                          setState(() {
+                            _previewAvatarColor = avatarKey;
+                          });
+                        }
+                      : null, // locked → disable tap
+                  child: Stack(
+                    children: [
+                      // Avatar box
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.secondaryBrand.withOpacity(0.2)
+                              : Colors.white.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.customAccent
+                                : Colors.white24,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: Opacity(
+                          opacity: isUnlocked ? 1.0 : 0.25, // fade locked avatars
+                          child: Image.asset(
+                            'assets/images/avatars/$avatarKey.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
                       ),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.customAccent
-                            : Colors.white24,
-                        width: isSelected ? 2 : 1,
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(8),
-                    child: Image.asset(
-                      'assets/images/avatars/$avatarKey.png',
-                      fit: BoxFit.contain,
-                    ),
+
+                      // 🔒 LOCK OVERLAY + level requirement
+                      if (!isUnlocked)
+                        Positioned.fill(
+                          child: Container(
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.lock,
+                                  color: Colors.white.withOpacity(0.9),
+                                  size: 32,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Lvl ${avatarMeta.requiredLevel}",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 );
               },

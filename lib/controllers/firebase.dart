@@ -1085,25 +1085,48 @@ Future<void> setGameOver({
   
 }
 
-void updateWinRate(List<GamePlayer> players, String? winnerTeam) {
+Future<void> updateWinRate(List<GamePlayer> players, String? winnerTeam) async {
   if (winnerTeam == null || winnerTeam.isEmpty) return;
 
   for (var player in players) {
-    if (player.role == "wizard") {
-      final isWinner = (winnerTeam == "order");  
+    final docRef = _firestore.collection("users").doc(player.username);
 
-      _firestore.collection("users").doc(player.username).update({
-        isWinner ? "wins" : "losses": FieldValue.increment(1),
-      });
-    } else {
-      final isWinner = (winnerTeam == "warlocks");  
+    // Determine if this player won
+    final bool isWinner = (player.role == "wizard")
+        ? (winnerTeam == "order")
+        : (winnerTeam == "warlocks");
 
-      _firestore.collection("users").doc(player.username).update({
-        isWinner ? "wins" : "losses": FieldValue.increment(1),
+    final int expGain = isWinner ? 20 : 10;
+    final String winField = isWinner ? "wins" : "losses";
+
+    // Run an atomic transaction
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+
+      if (!snapshot.exists) return;
+
+      int level = snapshot.data()?["currentLevel"] ?? 1;
+      int exp = snapshot.data()?["exp"] ?? 0;
+
+      // Add exp
+      exp += expGain;
+
+      // Handle rollover & leveling
+      if (exp >= 100) {
+        level += (exp ~/ 100);
+        exp = exp % 100;
+      }
+
+      // Update everything atomically
+      transaction.update(docRef, {
+        winField: FieldValue.increment(1),
+        "exp": exp,
+        "currentLevel": level,
       });
-    }
+    });
   }
 }
+
 
 
 
