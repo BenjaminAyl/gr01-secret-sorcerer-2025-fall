@@ -1085,6 +1085,26 @@ Future<void> setGameOver({
   
 }
 
+void updateWinRate(List<GamePlayer> players, String? winnerTeam) {
+  if (winnerTeam == null || winnerTeam.isEmpty) return;
+
+  for (var player in players) {
+    if (player.role == "wizard") {
+      final isWinner = (winnerTeam == "order");  
+
+      _firestore.collection("users").doc(player.username).update({
+        isWinner ? "wins" : "losses": FieldValue.increment(1),
+      });
+    } else {
+      final isWinner = (winnerTeam == "warlocks");  
+
+      _firestore.collection("users").doc(player.username).update({
+        isWinner ? "wins" : "losses": FieldValue.increment(1),
+      });
+    }
+  }
+}
+
 
 
 }

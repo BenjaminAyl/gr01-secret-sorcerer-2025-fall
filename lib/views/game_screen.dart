@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:secret_sorcerer/constants/app_colours.dart';
 import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/controllers/firebase.dart';
+import 'package:secret_sorcerer/models/game_player.dart';
 import 'package:secret_sorcerer/views/game_view.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
 
@@ -314,6 +315,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         winnerTeam: winnerTeam!,
                         onHostReturn: _uid == _creatorId
                             ? () async {
+                                _firebase.updateWinRate(_game.players, winnerTeam);
                                 await FirebaseFirestore.instance
                                     .collection('states')
                                     .doc(widget.code)
