@@ -1,36 +1,37 @@
-enum AvatarColors {
-  base,
-  pink,
-}
+enum AvatarStyles { 
+  base, 
+  moustache, 
+  eyes,
+  liam,  
+  frog, 
+  }
 
-class AvatarColorData {
+class AvatarStyleData {
   final int requiredLevel;
   final String assetName;
 
-  const AvatarColorData({
-    required this.requiredLevel,
-    required this.assetName,
-  });
+  const AvatarStyleData({required this.requiredLevel, required this.assetName});
 }
 
-const Map<AvatarColors, AvatarColorData> avatarColorInfo = {
-  AvatarColors.base: AvatarColorData(
-    requiredLevel: 0,
-    assetName: 'avatarDefault',
-  ),
-  AvatarColors.pink: AvatarColorData(
-    requiredLevel: 5,
-    assetName: 'avatarPink',
-  ),
+const Map<AvatarStyles, AvatarStyleData> avatarStyleInfo = {
+  AvatarStyles.base: AvatarStyleData(requiredLevel: 0, assetName: 'avatarDefault'),
+  AvatarStyles.moustache: AvatarStyleData(requiredLevel: 2, assetName: 'avatarMoustache'),
+  AvatarStyles.eyes: AvatarStyleData(requiredLevel: 3, assetName: 'avatarEyes'),
+  AvatarStyles.liam: AvatarStyleData(requiredLevel: 4, assetName: 'avatarLiam'),
+  AvatarStyles.frog: AvatarStyleData(requiredLevel: 5, assetName: 'avatarFrog'),
 };
 
-
-
-String avatarColorToString(AvatarColors avatarColor) {
-  switch (avatarColor) {
-    case AvatarColors.base:
+String avatarColorToString(AvatarStyles avatarStyle) {
+  switch (avatarStyle) {
+    case AvatarStyles.base:
       return 'avatarDefault';
-    case AvatarColors.pink:
-      return 'avatarPink';
+    case AvatarStyles.moustache:
+      return 'avatarMoustache';
+    case AvatarStyles.eyes:
+      return 'avatarEyes';
+    case AvatarStyles.liam:
+      return 'avatarLiam';
+    case AvatarStyles.frog:
+      return 'avatarFrog';
   }
 }

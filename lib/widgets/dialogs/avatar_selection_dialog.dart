@@ -81,12 +81,12 @@ class _AvatarSelectionDialogState extends State<AvatarSelectionDialog> {
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
               ),
-              itemCount: AvatarColors.values.length,
+              itemCount: AvatarStyles.values.length,
               itemBuilder: (context, index) {
-                final avatarEnum = AvatarColors.values[index];
+                final avatarEnum = AvatarStyles.values[index];
                 final avatarKey = avatarColorToString(avatarEnum);
                 final isSelected = avatarKey == _previewAvatarColor;
-                final avatarMeta = avatarColorInfo[avatarEnum]!;
+                final avatarMeta = avatarStyleInfo[avatarEnum]!;
                 final isUnlocked = widget.level >= avatarMeta.requiredLevel;
                 return InkWell(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
