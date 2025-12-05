@@ -24,6 +24,7 @@ class WizardGameView extends FlameGame with TapCallbacks {
   List<GamePlayer> players = [];
   Set<String> _prevDeadUids = {};
   Map<String, String> nicknameCache = {}; // uid to nickname
+  Map<String, String> hatColorCache = {}; // uid to hat asset name
   int headmasterIndex = 0;
   int? spellcasterIndex;
   int? nomineeIndex; // nominee being voted on
@@ -295,20 +296,32 @@ class WizardGameView extends FlameGame with TapCallbacks {
 
   Future<void> _resolveNicknames() async {
     final usersRef = FirebaseFirestore.instance.collection('users');
+
     for (final p in players) {
       final uid = p.username;
-      if (nicknameCache.containsKey(uid)) continue;
+
+      if (nicknameCache.containsKey(uid) && hatColorCache.containsKey(uid)) {
+        continue;
+      }
+
       try {
         final doc = await usersRef.doc(uid).get();
+
         if (doc.exists) {
           final data = doc.data() ?? {};
+
           nicknameCache[uid] =
               data['nickname'] ?? data['Nickname'] ?? 'Wizard';
+
+          hatColorCache[uid] =
+              data['hatColor'] ?? 'hatDefault';
         } else {
           nicknameCache[uid] = 'Wizard';
+          hatColorCache[uid] = 'hatDefault';
         }
       } catch (_) {
         nicknameCache[uid] = 'Wizard';
+        hatColorCache[uid] = 'hatDefault';
       }
     }
   }
@@ -372,7 +385,14 @@ class WizardGameView extends FlameGame with TapCallbacks {
       final uid = players[i].username;
       final nickname = nicknameCache[uid] ?? 'Wizard ${i + 1}';
 
-      final hat = PlayerHatComponent(i, nickname, _onHatTapped)
+      final hatColor = hatColorCache[uid] ?? 'hatDefault';
+
+      final hat = PlayerHatComponent(
+        i,
+        nickname,
+        hatColor,
+        _onHatTapped,
+      )
         ..position = pos
         ..scale = Vector2.all(1.2);
       add(hat);
@@ -678,6 +698,8 @@ class WizardGameView extends FlameGame with TapCallbacks {
 class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   final int index;
   final String nickname;
+  final String hatAsset;
+
   final void Function(int) onTap;
   late TextComponent label;
 
@@ -686,14 +708,14 @@ class PlayerHatComponent extends SpriteComponent with TapCallbacks {
   bool hasWhiteHMGlow = false;
 
 
-  PlayerHatComponent(this.index, this.nickname, this.onTap)
+  PlayerHatComponent(this.index, this.nickname, this.hatAsset, this.onTap)
       : super(size: Vector2.all(45), anchor: Anchor.center);
 
   static const double _labelGap = 0.5;
 
   @override
   Future<void> onLoad() async {
-    sprite = await Sprite.load('wizard_hat.png');
+    sprite = await Sprite.load('hats/$hatAsset.png');
     label = TextComponent(
       text: nickname,
       textRenderer: TextPaint(

@@ -15,6 +15,7 @@ final userAuth = UserAuth();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky,);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await AudioHelper.init();
   final user = await UserAuth().getCurrentUser();

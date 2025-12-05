@@ -50,33 +50,33 @@ class FirebaseController {
     final code = randomInt.toString();
     final lobbyRef = _firestore.collection('lobbies').doc(code);
 
-    //lowercase key fix
     final userDoc = await _firestore.collection('users').doc(user.uid).get();
     final userData = userDoc.data() ?? {};
+
     final nickname = userData['Nickname'] ?? 'Unknown';
+    final hatColor = userData['hatColor'] ?? 'hatDefault'; 
 
     await lobbyRef.set({
       'status': 'waiting',
       'creatorId': user.uid,
       'players': [user.uid],
       'nicknames': {user.uid: nickname},
+      'hatColors': {user.uid: hatColor}, 
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    
-  await _firestore.collection('users').doc(user.uid).update({
-    'currentLobby': code,
-    'currentGame': null, // ensure clean state
-  });
-
+    await _firestore.collection('users').doc(user.uid).update({
+      'currentLobby': code,
+      'currentGame': null,
+    });
 
     return lobbyRef;
   }
 
+
   Future<void> joinLobby(String lobbyId, String playerId) async {
     final lobbyRef = _firestore.collection('lobbies').doc(lobbyId);
 
-    // Ensure lobby exists — update() will fail with 'No document to update' if it doesn't
     final lobbySnap = await lobbyRef.get();
     if (!lobbySnap.exists) {
       throw Exception('LobbyNotFound');
@@ -84,11 +84,14 @@ class FirebaseController {
 
     final userDoc = await _firestore.collection('users').doc(playerId).get();
     final userData = userDoc.data() ?? {};
-    final nickname = userData['Nickname'] ?? 'Unknown'; //lowercase fix
+
+    final nickname = userData['Nickname'] ?? 'Unknown';
+    final hatColor = userData['hatColor'] ?? 'hatDefault'; 
 
     await lobbyRef.update({
       'players': FieldValue.arrayUnion([playerId]),
       'nicknames.$playerId': nickname,
+      'hatColors.$playerId': hatColor, 
     });
 
     await _firestore.collection('users').doc(playerId).update({
@@ -107,6 +110,7 @@ class FirebaseController {
       tx.update(lobbyRef, {
         'players': FieldValue.arrayRemove([playerId]),
         'nicknames.$playerId': FieldValue.delete(),
+        'hatColors.$playerId': FieldValue.delete(),
       });
     });
 
@@ -115,6 +119,7 @@ class FirebaseController {
       'currentGame': null,
     });
   }
+
 
 
   Future<void> deleteLobby(String lobbyId) async {
@@ -660,13 +665,6 @@ class FirebaseController {
     });
   }
   String? _executivePowerFor(int players, int curses) {
-
-    //TESTING: enable executive powers for small test games
-    if (players < 5) { 
-    if (curses == 1) return 'choose_next_hm'; //not meant to play with under 5
-     return null;
-     }
-
     //real game
     // 5–6 players
     if (players == 5 || players == 6) {
