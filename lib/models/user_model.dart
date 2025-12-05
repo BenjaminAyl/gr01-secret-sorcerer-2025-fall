@@ -46,6 +46,8 @@ class AppUser {
         'username': username,
         'nickname': nickname,
         'nickame': nickname,
+        'hatColor': hatColor,
+        'avatarColor': avatarColor,
         'wins': wins,
         'losses': losses,
         'exp': exp,

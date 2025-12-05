@@ -40,8 +40,14 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               AppSpacing.gapXXL,
               AppSpacing.gapXXL,
-              Text('Secret Sorcerer', style: TextStyles.title),
-              AppSpacing.spaceXXL,
+              Image.asset(
+                'assets/logos/secretSorcerer.png', // <- your image path
+                width: 380, // adjust as needed
+                height: 200,
+                fit: BoxFit.contain,
+              ),
+              AppSpacing.spaceL,
+              AppSpacing.gapXL,
 
               PrimaryButton(
                 label: 'Host Game',
@@ -65,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
 
+              //AppSpacing.gapXXL,
               AppSpacing.buttonSpacing,
 
               PrimaryButton(
@@ -145,6 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               AppSpacing.gapXL,
+              AppSpacing.gapL,
             ],
           ),
         ),

@@ -51,7 +51,12 @@ class _LoginScreenState extends State<LoginScreen> {
           spacing: 10,
           children: [
             // Match Signup title styling
-            Text('Secret Sorcerer', style: TextStyles.title),
+            Image.asset(
+              'assets/logos/secretSorcerer.png', // <- your image path
+              width: 380, // adjust as needed
+              height: 200,
+              fit: BoxFit.contain,
+            ),
             Text('Login', style: TextStyles.title.copyWith(fontSize: 32)),
             AppSpacing.gapM,
 
@@ -83,7 +88,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   await userAuth.signIn(email: email, password: password);
                   final user = await userAuth.getCurrentUser();
                   if (user != null) {
-                    CurrentStyle.loadFromUser(user); // Cache users avatar in util
+                    CurrentStyle.loadFromUser(
+                      user,
+                    ); // Cache users avatar in util
                   }
 
                   if (!context.mounted) return;
