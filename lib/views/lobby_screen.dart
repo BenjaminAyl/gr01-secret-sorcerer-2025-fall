@@ -1,4 +1,3 @@
-// lib/views/lobby_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +9,6 @@ import 'package:secret_sorcerer/constants/app_text_styling.dart';
 import 'package:secret_sorcerer/constants/app_spacing.dart';
 import 'package:secret_sorcerer/widgets/buttons/primary_button.dart';
 import 'package:secret_sorcerer/utils/audio_helper.dart';
-
 
 class LobbyScreen extends StatefulWidget {
   final String code;
@@ -35,7 +33,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
     Future.microtask(() {
       AudioHelper.crossfade('TavernLobbyMusic.wav');
     });
-
   }
 
   Future<void> _initLobby() async {
@@ -47,7 +44,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   Future<void> _cleanupOnExit() async {
     try {
-      if (_isStartingGame || _navigatingToGame) return; // <-- CHANGE
+      if (_isStartingGame || _navigatingToGame) return; //maybe change for safer clean up
 
       final snap = await FirebaseFirestore.instance
           .collection('lobbies')
@@ -67,11 +64,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   void dispose() {
-    _cleanupOnExit(); 
+    _cleanupOnExit();
     super.dispose();
   }
-
-
 
   Future<void> _leave(Map<String, dynamic> data) async {
     if (_isStartingGame) return;
@@ -85,14 +80,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
     if (mounted) context.go('/home');
   }
 
-
   // Host starts the game
   Future<void> _start(List<String> ids) async {
     _isStartingGame = true;
     await _lobbyController.startGame(ids);
     if (mounted) context.go('/reveal/${widget.code}');
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +116,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
           final creatorId = data['creatorId'] as String;
           final ids = List<String>.from((data['players'] ?? []).cast<String>());
           final nicknames = Map<String, dynamic>.from(data['nicknames'] ?? {});
+          final hatColors = Map<String, dynamic>.from(data['hatColors'] ?? {}); 
           final isHost = creatorId == playerId;
           final canStart = ids.length > 1;
 
@@ -141,7 +135,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
           if (status == 'playing') {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) {
-                _navigatingToGame = true; 
+                _navigatingToGame = true;
                 context.go('/reveal/${widget.code}');
               }
             });
@@ -154,10 +148,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
             });
           }
 
-
           // UI data
           final hostName = '${nicknames[creatorId] ?? 'Host'} (Host)';
-
           final otherPlayers = ids.where((id) => id != creatorId).toList();
 
           return Scaffold(
@@ -178,8 +170,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   await Future.delayed(const Duration(milliseconds: 120));
                   await _leave(data);
                 },
-
-
               ),
             ),
             body: SafeArea(
@@ -234,7 +224,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     Column(
                       children: [
                         Image.asset(
-                          'assets/images/wizard_hat.png',
+                          'assets/images/hats/${hatColors[creatorId] ?? 'hatDefault'}.png',
                           width: 80,
                           height: 80,
                           fit: BoxFit.contain,
@@ -264,11 +254,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                 alignment: WrapAlignment.center,
                                 children: otherPlayers.map((uid) {
                                   final name = nicknames[uid] ?? 'Unknown';
+
                                   return Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Image.asset(
-                                        'assets/images/wizard_hat.png',
+                                        'assets/images/hats/${hatColors[uid] ?? 'hatDefault'}.png',
                                         width: 70,
                                         height: 70,
                                         fit: BoxFit.contain,

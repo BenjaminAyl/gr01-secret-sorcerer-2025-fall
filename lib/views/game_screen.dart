@@ -168,27 +168,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           Widget topHUD = Column(
                             children: [
                               SizedBox(height: height * 0.012),
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: width * 0.05,
-                                  vertical: height * 0.01,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.secondaryBrand.withOpacity(0.75),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: Text(
-                                  isHM
-                                      ? "You are the Headmaster"
-                                      : isSC
-                                          ? "You are the Spellcaster"
-                                          : "Waiting...",
-                                  style: TextStyles.bodySmall.copyWith(
-                                    fontSize: height * 0.02,
-                                    color: AppColors.textAccent,
-                                  ),
-                                ),
-                              ),
+                              SizedBox(
+                                height: height * 0.055,),
                               SizedBox(height: height * 0.005),
                               GameNotificationBar(
                                 game: g,
