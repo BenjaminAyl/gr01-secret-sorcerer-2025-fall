@@ -21,10 +21,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _showSnackBar(String message, {Color? color}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color ?? Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: color ?? Colors.red),
     );
   }
 
@@ -34,7 +31,10 @@ class _SignupScreenState extends State<SignupScreen> {
     final username = _usernameController.text.trim();
     final nickname = _nicknameController.text.trim();
 
-    if (email.isEmpty || password.isEmpty || username.isEmpty || nickname.isEmpty) {
+    if (email.isEmpty ||
+        password.isEmpty ||
+        username.isEmpty ||
+        nickname.isEmpty) {
       _showSnackBar('Please fill in all fields before continuing.');
       return false;
     }
@@ -72,7 +72,12 @@ class _SignupScreenState extends State<SignupScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           spacing: 10,
           children: [
-            Text('Secret Sorcerer', style: TextStyles.title),
+            Image.asset(
+              'assets/logos/secretSorcerer.png', // <- your image path
+              width: 380, // adjust as needed
+              height: 200,
+              fit: BoxFit.contain,
+            ),
             Text(
               'Become a Sorcerer!',
               style: TextStyles.title.copyWith(fontSize: 32),
@@ -132,7 +137,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 final nickname = _nicknameController.text.trim();
 
                 try {
-                  final available = await userAuth.isUsernameAvailable(username);
+                  final available = await userAuth.isUsernameAvailable(
+                    username,
+                  );
                   if (!available) {
                     _showSnackBar('That username is already taken.');
                     return;
@@ -151,7 +158,6 @@ class _SignupScreenState extends State<SignupScreen> {
                     color: Colors.green,
                   );
                   context.go('/');
-
                 } on FirebaseAuthException catch (e) {
                   if (!mounted) return;
 
@@ -172,7 +178,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   }
 
                   _showSnackBar(message);
-
                 } catch (e) {
                   if (!mounted) return;
                   _showSnackBar('Unexpected error. Please try again later.');
@@ -191,7 +196,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     context.go('/');
                   },
                   child: const Text('Login'),
-                )
+                ),
               ],
             ),
           ],
